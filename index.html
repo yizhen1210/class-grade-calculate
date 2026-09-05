@@ -327,6 +327,8 @@
 
         // 有段考的固定科目（主科：平時+段考）
         const CORE_SUBJECTS = ['國語', '數學'];
+        // 抽離：只有國語/數學可設定；抽離的學生不登記作業/平考/表現分數，改在平時分數頁手動輸入
+        function isStudentPulledOut(student, subjectKey){ return CORE_SUBJECTS.includes(subjectKey) && !!(student.pullout && student.pullout[subjectKey]); }
         // 只登記段考分數、無平時明細的固定科目
         const EXAM_ONLY = ['自然', '社會', '英文'];
         const EXAM_SUBJECTS = [...CORE_SUBJECTS, ...EXAM_ONLY]; // 段考成績頁使用
@@ -385,6 +387,7 @@
             if(!sc.daily[subjectKey][periodKey]) sc.daily[subjectKey][periodKey] = {};
             const b = sc.daily[subjectKey][periodKey];
             CATEGORY_KEYS.forEach(cat => { if(!b[cat]) b[cat] = emptyCategoryBucket(); if(!b[cat].columns) b[cat].columns = []; if(!b[cat].values) b[cat].values = {}; });
+            if(!b.manualDaily) b.manualDaily = {}; // 抽離學生的平時分數手動輸入值
             return b;
         }
 
@@ -427,6 +430,11 @@
             const qz = categoryAverage(bucket.quiz, sid);
             const pf = categoryAverage(bucket.perform, sid);
             return (hw || 0) * w.homework + (qz || 0) * w.quiz + (pf || 0) * w.perform;
+        }
+        // 抽離的學生改用手動輸入的平時分數；否則照常用作業/平考/表現算
+        function effectiveDaily100(bucket, sid, weights, pulledOut){
+            if(pulledOut) return getLeaf(bucket.manualDaily, sid) || 0;
+            return dailyScore100FromBucket(bucket, sid, weights);
         }
 
         /* ---------- 未登入畫面 ---------- */
@@ -586,8 +594,14 @@
             `;
             const body = area.querySelector('#catBody');
             data.students.forEach(s => {
-                const avg = categoryAverage(catBucket, s.id);
+                const pulledOut = isStudentPulledOut(s, dailySubjectKey);
                 const tr = document.createElement('tr');
+                if(pulledOut){
+                    tr.innerHTML = `<td class="name-cell">${escapeHtml(s.name)}</td>${catBucket.columns.map(() => `<td>－</td>`).join('')}<td class="derived">抽離</td>`;
+                    body.appendChild(tr);
+                    return;
+                }
+                const avg = categoryAverage(catBucket, s.id);
                 tr.innerHTML = `<td class="name-cell">${escapeHtml(s.name)}</td>${catBucket.columns.map(c => `<td><input type="number" min="0" max="100" step="0.5" data-col="${c.id}" value="${getLeaf(catBucket.values[s.id], c.id) ?? ''}"></td>`).join('')}<td class="derived" data-f="avg">${avg !== null ? fmt(avg) : '-'}</td>`;
                 catBucket.columns.forEach(c => {
                     const inp = tr.querySelector(`input[data-col="${c.id}"]`);
@@ -630,7 +644,7 @@
                 </div>
             `;
             const formulaText = sub.hasExam
-                ? '平時分數 ＝ 作業平均×0.4 ＋ 平考平均×0.4 ＋ 上課表現平均×0.2'
+                ? '平時分數 ＝ 作業平均×0.4 ＋ 平考平均×0.4 ＋ 上課表現平均×0.2（抽離學生改為手動輸入）'
                 : `平時分數 ＝ 作業平均×${fmt(weights.homework)} ＋ 上課表現平均×${fmt(weights.perform)}`;
             area.innerHTML = `
                 ${weightEditor}
@@ -639,6 +653,11 @@
                     <table class="grid">
                         <thead><tr><th>姓名</th><th>作業平均</th>${sub.hasExam ? '<th>平考平均</th>' : ''}<th>表現平均</th><th>平時分數</th></tr></thead>
                         <tbody>${data.students.map(s => {
+                            const pulledOut = isStudentPulledOut(s, sub.key);
+                            if(pulledOut){
+                                const manualVal = getLeaf(bucket.manualDaily, s.id);
+                                return `<tr><td class="name-cell">${escapeHtml(s.name)}</td><td>－</td>${sub.hasExam ? '<td>－</td>' : ''}<td>－</td><td><input type="number" class="manual-daily-input" data-sid="${s.id}" min="0" max="100" step="0.5" value="${manualVal ?? ''}"></td></tr>`;
+                            }
                             const hw = categoryAverage(bucket.homework, s.id);
                             const qz = categoryAverage(bucket.quiz, s.id);
                             const pf = categoryAverage(bucket.perform, s.id);
@@ -648,6 +667,11 @@
                     </table>
                 </div>
             `;
+            area.querySelectorAll('.manual-daily-input').forEach(inp => inp.onchange = e => {
+                const v = e.target.value;
+                bucket.manualDaily[inp.dataset.sid] = v === '' ? null : num(v);
+                saveLeaf(['scores', 'daily', dailySubjectKey, dailyPeriod, 'manualDaily', inp.dataset.sid], bucket.manualDaily[inp.dataset.sid]);
+            });
             if(!sub.hasExam){
                 const saveWeights = () => {
                     const hwPct = num(area.querySelector('#wHomework').value);
@@ -758,8 +782,9 @@
                 const midBucket = ensureDailyBucket(sub.key, 'mid');
                 const finalBucket = ensureDailyBucket(sub.key, 'final');
                 data.students.forEach(s => {
-                    const midDaily = dailyScore100FromBucket(midBucket, s.id);
-                    const finalDaily = dailyScore100FromBucket(finalBucket, s.id);
+                    const pulledOut = isStudentPulledOut(s, sub.key);
+                    const midDaily = effectiveDaily100(midBucket, s.id, undefined, pulledOut);
+                    const finalDaily = effectiveDaily100(finalBucket, s.id, undefined, pulledOut);
                     const examMid = getLeaf(sc.examMid[s.id], sub.key) || 0;
                     const examFinal = getLeaf(sc.examFinal[s.id], sub.key) || 0;
                     const total = (midDaily + finalDaily + examMid + examFinal) * 0.25;
@@ -796,9 +821,10 @@
             const data = state();
             el.innerHTML = `
                 <div class="section-title" style="margin-top:0">學生名單</div>
+                <p class="hint-text">「抽離」勾選後，該生在國語／數學的作業、平考、上課表現不會出現分數欄，改在該科的「平時分數」子頁手動輸入平時分數。</p>
                 <div class="table-wrap">
                     <table class="grid">
-                        <thead><tr><th>座號</th><th>姓名</th><th>操作</th></tr></thead>
+                        <thead><tr><th>座號</th><th>姓名</th>${CORE_SUBJECTS.map(sub => `<th>${sub}抽離</th>`).join('')}<th>操作</th></tr></thead>
                         <tbody id="rosterBody"></tbody>
                     </table>
                 </div>
@@ -825,12 +851,20 @@
             data.students.forEach((s, idx) => {
                 const tr = document.createElement('tr');
                 tr.className = 'roster-row';
-                tr.innerHTML = `<td>${idx + 1}</td><td><input type="text" value="${escapeHtml(s.name)}"></td><td><button class="btn danger small">刪除</button></td>`;
-                tr.querySelector('input').onchange = e => {
+                tr.innerHTML = `<td>${idx + 1}</td><td><input type="text" value="${escapeHtml(s.name)}"></td>${CORE_SUBJECTS.map(sub => `<td><input type="checkbox" data-pullout="${sub}" ${s.pullout && s.pullout[sub] ? 'checked' : ''}></td>`).join('')}<td><button class="btn danger small">刪除</button></td>`;
+                tr.querySelector('input[type=text]').onchange = e => {
                     s.name = e.target.value.trim() || s.name;
                     saveLeaf(['students'], data.students);
                     refreshAllPanels();
                 };
+                CORE_SUBJECTS.forEach(sub => {
+                    tr.querySelector(`input[data-pullout="${sub}"]`).onchange = e => {
+                        if(!s.pullout) s.pullout = {};
+                        s.pullout[sub] = e.target.checked;
+                        saveLeaf(['students'], data.students);
+                        refreshAllPanels();
+                    };
+                });
                 tr.querySelector('button').onclick = async () => {
                     const ok = await askConfirm(`確定刪除「${s.name}」？`);
                     if(ok){
