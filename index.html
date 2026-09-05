@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>608成績計算</title>
+
+    <!-- PWA / 桌面圖示：三張 PNG 與此檔同目錄一起上傳，檔名須與 manifest 一致 -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
+    <meta name="theme-color" content="#8c7768">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Iansui&display=swap" rel="stylesheet">
+
+    <style>
+        /* ---- 全站設計變數：顏色一律用變數，勿寫死 ---- */
+        :root {
+            --bg: #e8e4da;          /* 頁面底色 */
+            --surface: #ffffff;     /* 卡片/輸入框底 */
+            --text: #332b24;        /* 主文字 */
+            --muted: #a39a8e;       /* 次要/placeholder */
+            --accent-rgb: 140,119,104;            /* 主色 RGB（改這裡即可，其餘自動跟隨）－取自 icon 的深咖啡色 */
+            --accent: rgb(var(--accent-rgb));     /* 主色（按鈕、邊框、focus） */
+            --focus-glow: color-mix(in srgb, var(--accent) 50%, transparent); /* focus 光暈：自動＝主色 */
+            --accent-dark: color-mix(in srgb, var(--accent) 82%, #000); /* 主色 hover：自動加深 */
+            --line: #d8d1c4;        /* 分隔線/淺邊框 */
+            --danger: #c4674f;      /* 刪除/警示 */
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Iansui', system-ui, sans-serif;
+            margin: 0; min-height: 100vh;
+            background: var(--bg); color: var(--text);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ---- 載入 gate：首次資料到齊前隱藏會變動的內容，避免預設值閃現 ---- */
+        body:not(.ready) [data-gated] { visibility: hidden; }
+
+        /* ---- 彈窗 base（所有 app 共用這組命名，勿改名） ---- */
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); align-items: center; justify-content: center; z-index: 1000; }
+        .modal-content { background: var(--surface); border: 3px solid var(--line); padding: 36px 44px; border-radius: 20px; text-align: center; box-shadow: 0 20px 55px rgba(0,0,0,0.4); width: min(520px, 90vw); }
+        .modal-title { font-size: 1.4em; margin: 0 0 22px; }
+        .modal-content input { display: block; width: 100%; margin: 0 0 24px; padding: 12px 18px; border: 2px solid var(--line); border-radius: 14px; font-family: inherit; font-size: 1.1em; outline: none; text-align: center; background: var(--surface); color: var(--text); }
+        .modal-content input::placeholder { color: var(--muted); }
+        .modal-input { display: block; width: 100%; margin: 0 0 24px; padding: 12px 18px; border: 2px solid var(--line); border-radius: 14px; font-family: inherit; font-size: 1.1em; outline: none; text-align: center; background: var(--surface); color: var(--text); }
+        .modal-input::placeholder { color: var(--muted); }
+        .modal-input:focus { border-color: var(--accent); box-shadow: 0 0 12px 3px var(--focus-glow); }
+        .modal-content input:focus { border-color: var(--accent); box-shadow: 0 0 12px 3px var(--focus-glow); }
+        .modal-hint { display: none; margin: -14px 0 18px; font-size: 0.9em; color: var(--danger); }
+        .modal-actions { display: flex; justify-content: center; gap: 18px; }
+        .modal-actions button { padding: 11px 38px; border-radius: 50px; cursor: pointer; font-family: inherit; font-size: 1.15em; border: 2px solid var(--accent); }
+        .btn-ok { background: var(--accent); color: #fff; }
+        .btn-ok:hover { background: var(--accent-dark); }
+        .btn-cancel { background: #f2f8f9; color: var(--accent); }
+        .btn-cancel:hover { background: var(--accent); color: #fff; }
+        @media (max-width: 640px) {
+            .modal-content { padding: 26px 22px; width: min(420px, 88vw); }
+            .modal-title { white-space: nowrap; }
+        }
+
+        /* ---- 一般按鈕 ---- */
+        .btn { padding: 9px 22px; border-radius: 50px; border: 2px solid var(--accent); background: var(--accent); color: #fff; font-family: inherit; font-size: 1em; cursor: pointer; }
+        .btn.outline { background: transparent; color: var(--accent); }
+        .btn.small { padding: 5px 14px; font-size: 0.85em; }
+        .btn.danger { border-color: var(--danger); background: var(--danger); }
+
+        .admin-only.hidden { display: none; }
+
+        /* ---- 業務樣式 ---- */
+        header { display: flex; align-items: center; justify-content: space-between; padding: 18px 24px; border-bottom: 2px solid var(--line); flex-wrap: wrap; gap: 10px; }
+        header h1 { font-size: 1.5em; margin: 0; }
+        main, #adminArea { max-width: 1100px; margin: 0 auto; padding: 20px 16px 60px; }
+
+        .empty-note { text-align: center; color: var(--muted); padding: 60px 20px; font-size: 1.1em; }
+
+        .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
+        .tab-btn { padding: 8px 20px; border-radius: 50px; border: 2px solid var(--line); background: var(--surface); color: var(--text); font-family: inherit; cursor: pointer; font-size: 0.95em; }
+        .tab-btn.active { border-color: var(--accent); background: var(--accent); color: #fff; }
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+
+        .toolbar { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
+        .toolbar select { padding: 8px 14px; border-radius: 10px; border: 2px solid var(--line); background: var(--surface); color: var(--text); font-family: inherit; font-size: 0.95em; }
+        .toolbar label { font-size: 0.9em; color: var(--muted); }
+
+        .table-wrap { overflow-x: auto; border: 2px solid var(--line); border-radius: 14px; background: var(--surface); }
+        table.grid { border-collapse: collapse; width: 100%; min-width: 560px; }
+        table.grid th, table.grid td { padding: 8px 10px; text-align: center; border-bottom: 1px solid var(--line); white-space: nowrap; }
+        table.grid th { background: color-mix(in srgb, var(--accent) 12%, var(--surface)); font-weight: normal; color: var(--text); position: sticky; top: 0; }
+        table.grid td.name-cell { text-align: left; font-weight: bold; }
+        table.grid tr:last-child td { border-bottom: none; }
+        table.grid input[type=number] { width: 70px; padding: 6px 4px; border: 2px solid var(--line); border-radius: 8px; text-align: center; font-family: inherit; font-size: 0.95em; background: var(--surface); color: var(--text); }
+        table.grid input[type=number]:focus { border-color: var(--accent); box-shadow: 0 0 8px 2px var(--focus-glow); outline: none; }
+        table.grid input[type=text] { padding: 6px 10px; border: 2px solid var(--line); border-radius: 8px; font-family: inherit; font-size: 0.95em; background: var(--surface); color: var(--text); width: 140px; }
+        table.grid input[type=text]:focus { border-color: var(--accent); box-shadow: 0 0 8px 2px var(--focus-glow); outline: none; }
+        td.derived { font-weight: bold; color: var(--accent-dark); }
+        td.rank-cell { font-weight: bold; }
+
+        .section-title { font-size: 1.15em; margin: 26px 0 10px; padding-bottom: 6px; border-bottom: 2px solid var(--line); }
+        .section-title:first-child { margin-top: 0; }
+
+        .roster-row td { padding: 6px 10px; }
+        .add-student-bar { display: flex; justify-content: flex-end; margin-top: 14px; }
+
+        .class-name-field { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+        .class-name-field input[type=text] { padding: 8px 14px; border: 2px solid var(--line); border-radius: 10px; font-family: inherit; font-size: 1em; background: var(--surface); color: var(--text); width: 140px; }
+        .class-name-field input[type=text]:focus { border-color: var(--accent); box-shadow: 0 0 8px 2px var(--focus-glow); outline: none; }
+
+        .hint-text { color: var(--muted); font-size: 0.85em; margin: -6px 0 16px; }
+    </style>
+</head>
+<body>
+    <!-- ====== 版面骨架 ====== -->
+    <header>
+        <h1 data-gated><span id="appTitle">608</span>成績計算</h1>
+        <div>
+            <button id="loginBtn" class="btn outline">登入</button>
+            <button id="logoutBtn" class="btn outline admin-only hidden">登出</button>
+        </div>
+    </header>
+
+    <main id="content" data-gated>
+        <!-- 未登入時顯示的內容：本 app 為班級成績登記工具，成績資料不對外公開，僅顯示提示 -->
+    </main>
+
+    <section id="adminArea" class="admin-only hidden" data-gated>
+        <!-- 登入後才顯示的編輯區 -->
+    </section>
+
+    <!-- ====== 密碼彈窗（本 app 未使用，登入模式為 C，保留骨架不刪） ====== -->
+    <div id="inputModal" class="modal-overlay">
+        <div class="modal-content">
+            <p class="modal-title">請輸入密碼</p>
+            <input type="password" id="passInput" placeholder="密碼" autocomplete="off">
+            <p id="imeHint" class="modal-hint">偵測到中文輸入法，密碼請切換為英數</p>
+            <div class="modal-actions">
+                <button class="btn-ok" onclick="checkPass()">確定</button>
+                <button class="btn-cancel" onclick="closeModal()">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== 通用提示框（取代原生 alert） ====== -->
+    <div id="alertModal" class="modal-overlay">
+        <div class="modal-content">
+            <p class="modal-title" id="alertMsg"></p>
+            <div class="modal-actions">
+                <button class="btn-ok" onclick="closeAlert()">確定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== 通用輸入框（取代原生 prompt；askInput 使用） ====== -->
+    <div id="promptModal" class="modal-overlay">
+        <div class="modal-content">
+            <p class="modal-title" id="promptMsg"></p>
+            <input type="text" id="promptInput" class="modal-input">
+            <div class="modal-actions">
+                <button class="btn-cancel" id="promptNo">取消</button>
+                <button class="btn-ok" id="promptOk">確定</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        /* =========================================================
+           通用骨架：Firebase + 三種登入模式 + 通用資料層 + 載入 gate
+           每支新 app 從此檔複製，只改「業務設定」與「業務邏輯」兩區。
+           ========================================================= */
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signOut,
+                 signInWithEmailAndPassword,
+                 GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const $ = id => document.getElementById(id);
+
+        /* ========== 業務設定（每支 app 改這裡） ========== */
+        // apiKey 可公開（Firebase web key 為識別碼，非機密）；安全靠 Firestore 規則，勿試圖隱藏
+        const firebaseConfig = {
+            apiKey: "AIzaSyCzUhHZBYNyQ2B6wPGQCeQbZUhW5NOdpKg",
+            authDomain: "class-grade-calculate.firebaseapp.com",
+            projectId: "class-grade-calculate",
+            storageBucket: "class-grade-calculate.firebasestorage.app",
+            messagingSenderId: "257124882838",
+            appId: "1:257124882838:web:96171c7d4f639cdb17a5b7"
+        };
+        const DOC_PATH = ["grades", "main"];   // Firestore 文件路徑
+        const SAVE_MERGE = true;               // 逐欄位 merge，避免不同分頁的儲存互相覆蓋
+
+        // 登入模式：'A'=共用帳號只輸密碼；'B'=綁 1 個 Google 帳號；'C'=綁 2 個 Google 帳號
+        const LOGIN_MODE = 'C';
+        const SHARED_EMAIL = "owner@example.com";
+        const ALLOWED_EMAILS = ["annychen1210@gmail.com", "annychen1210@go.edu.tw"]; // 這 2 個帳號都能登入並看到同一份資料
+        /* ================================================ */
+
+        // 啟動前檢查 config 是否已填，未填則顯示提示而非白畫面崩潰
+        if(!firebaseConfig.apiKey || !firebaseConfig.projectId){
+            document.body.innerHTML = '<div style="max-width:520px;margin:80px auto;padding:24px;font-family:sans-serif;line-height:1.7;color:#332b24;text-align:center">尚未填入 Firebase 設定。<br>請在原始碼「業務設定」區的 <code>firebaseConfig</code> 填入你的專案設定後再開啟。</div>';
+            throw new Error('firebaseConfig 未設定');
+        }
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const ref = doc(db, ...DOC_PATH);
+
+        let isAdmin = false, editorReady = false, dataArrived = false, errored = false, lastData = null;
+        function showLoadError(){ if(!document.getElementById('loadError')){ const d=document.createElement('div'); d.id='loadError'; d.textContent='載入失敗，請重新整理頁面'; d.style.cssText='position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--danger);color:#fff;padding:10px 18px;border-radius:10px;z-index:2000;font-size:0.95em'; document.body.appendChild(d); } }
+
+        /* ---------- 載入 gate ---------- */
+        let readyTimer = setTimeout(markReady, 8000);
+        function markReady(){ clearTimeout(readyTimer); document.body.classList.add("ready"); }
+
+        function maybeLoadEditor(){ if(isAdmin && dataArrived && !editorReady) loadEditor(lastData); }
+
+        /* ---------- 通用資料層 ---------- */
+        function saveData(obj){ if(!isAdmin) return; setDoc(ref, obj, { merge: SAVE_MERGE }).catch(e=>console.warn(e)); }
+        onSnapshot(ref, snap => {
+            lastData = snap.exists() ? snap.data() : null;
+            dataArrived = true;
+            renderPublic(lastData, { error: errored });
+            maybeLoadEditor(); markReady();
+        }, err => { console.warn(err); errored = true; renderPublic(lastData, { error: true }); showLoadError(); markReady(); });
+
+        function isAuthorized(user){
+            if(!user) return false;
+            if(LOGIN_MODE === 'A') return user.email === SHARED_EMAIL;
+            if(LOGIN_MODE === 'B') return user.email === ALLOWED_EMAILS[0];
+            if(LOGIN_MODE === 'C') return ALLOWED_EMAILS.slice(0,2).includes(user.email);
+            return false;
+        }
+        onAuthStateChanged(auth, user => {
+            isAdmin = isAuthorized(user);
+            document.querySelectorAll('.admin-only').forEach(el => el.classList.toggle('hidden', !isAdmin));
+            maybeLoadEditor();
+        });
+
+        window.showAlert = (msg) => { $('alertMsg').textContent = msg; $('alertModal').style.display = 'flex'; };
+        window.closeAlert = () => { $('alertModal').style.display = 'none'; };
+
+        window.askInput = (msg, def) => new Promise(res => {
+            const m = $('promptModal'), inp = $('promptInput'), ok = $('promptOk'), no = $('promptNo');
+            $('promptMsg').textContent = msg; inp.value = def || '';
+            m.style.display = 'flex'; setTimeout(() => { inp.focus(); inp.select(); }, 50);
+            const done = v => { m.style.display = 'none'; ok.onclick = null; no.onclick = null; inp.onkeydown = null; res(v); };
+            ok.onclick = () => done(inp.value);
+            no.onclick = () => done(null);
+            inp.onkeydown = e => { if(e.key === 'Enter') done(inp.value); else if(e.key === 'Escape') done(null); };
+        });
+
+        /* ---------- 登入 / 登出 ---------- */
+        $('loginBtn').onclick = () => {
+            if(LOGIN_MODE === 'A'){ window.openLogin(); }
+            else { signInWithPopup(auth, new GoogleAuthProvider()).catch(e=>window.showAlert("登入失敗")); }
+        };
+        $('logoutBtn').onclick = () => signOut(auth);
+
+        window.openLogin  = () => { $('passInput').value=''; $('imeHint').style.display='none'; $('inputModal').style.display='flex'; setTimeout(()=>$('passInput').focus(),50); };
+        window.closeModal = () => { $('inputModal').style.display='none'; $('passInput').value=''; $('imeHint').style.display='none'; };
+        window.checkPass  = async () => {
+            const pw = $('passInput').value; if(!pw){ window.showAlert('請輸入密碼'); return; }
+            try { await signInWithEmailAndPassword(auth, SHARED_EMAIL, pw); window.closeModal(); }
+            catch(e){ window.showAlert("密碼錯誤"); $('passInput').value=''; $('passInput').focus(); }
+        };
+        const checkIME = () => { $('imeHint').style.display = /[^\x00-\x7F]/.test($('passInput').value) ? 'block' : 'none'; };
+        $('passInput').addEventListener('keydown', e => { if(e.key === 'Enter' && !e.isComposing && e.keyCode !== 229) window.checkPass(); });
+        $('passInput').addEventListener('compositionstart', () => { $('imeHint').style.display='block'; });
+        $('passInput').addEventListener('input', e => { if(!e.isComposing) checkIME(); });
+        $('passInput').addEventListener('compositionend', checkIME);
+
+        /* ========== 業務邏輯 ========== */
+
+        // 有完整「平時成績」明細（作業+平考+表現）的科目
+        const SUBJECTS = ['國語', '數學'];
+        // 只登記段考分數、無平時明細的科目
+        const EXAM_ONLY = ['自然', '社會', '英文'];
+        const ALL_SUBJECTS = [...SUBJECTS, ...EXAM_ONLY];
+        // 段考加權排名用的科目權重（沿用原始段考成績表的比重）
+        const EXAM_WEIGHT = { 國語: 5, 數學: 4, 自然: 3, 社會: 3, 英文: 2 };
+        const PERIODS = { mid: '期中', final: '期末' };
+
+        const DEFAULT_CLASS_NAME = '608';
+        const DEFAULT_STUDENTS = ['陳愷寬','盧信睿','蔡杰助','李秉澤','鍾丞崴','郭宥均','朱子安','葉峻榮','翁士賢','高以恩',
+            '鄭宇凱','洪嘉威','顏翊達','張以柔','楊佩昕','王子芸','溫晨羽','宋梓瑜','姚可欣','許苙萲',
+            '徐子晴','李妍蓁','施姵岑','方弈喬','陳以玹','王芊晴','陳宣蓉'].map((name, i) => ({ id: 's' + (i + 1), name }));
+
+        function num(v){ const n = Number(v); return isNaN(n) ? 0 : n; }
+        function fmt(n, d = 1){ return (Math.round(n * Math.pow(10, d)) / Math.pow(10, d)).toString(); }
+
+        // 等第（依總分 0-100）
+        function letterGrade(total){ if(total >= 90) return '優'; if(total >= 80) return '甲'; if(total >= 70) return '乙'; if(total >= 60) return '丙'; return '丁'; }
+        // 努力程度（依平時分數 0-50 制）
+        function effortLevel(daily50){ if(daily50 >= 45) return '優異'; if(daily50 >= 42.5) return '良好'; if(daily50 >= 40) return '尚可'; return '再加油'; }
+
+        // 由 obj[sid] 取分數，未輸入視為 0（與原始 Excel 空白視為 0 一致）
+        function getLeaf(obj, sid){ return obj && obj[sid] !== undefined && obj[sid] !== null && obj[sid] !== '' ? Number(obj[sid]) : null; }
+
+        function deepGet(data, path){ let o = data; for(const k of path){ if(o == null) return undefined; o = o[k]; } return o; }
+        function deepSet(obj, path, value){ let o = obj; for(let i = 0; i < path.length - 1; i++){ if(!o[path[i]]) o[path[i]] = {}; o = o[path[i]]; } o[path[path.length - 1]] = value; }
+
+        // 平時分數（0-100 制）＝ 作業*0.4 ＋ 平考*0.4 ＋ 表現*0.2　（等同「(作業20%+平考20%+表現10%)*2」）
+        function dailyScore100(homework, quiz, perform){ return num(homework) * 0.4 + num(quiz) * 0.4 + num(perform) * 0.2; }
+        // 平時（50 制，學期用）＝ (期中100制 + 期末100制) / 4
+        function daily50(midScore100, finalScore100){ return (num(midScore100) + num(finalScore100)) / 4; }
+        // 段考（50 制，學期用）＝ (期中分 + 期末分) * 0.25
+        function examPart50(examMid, examFinal){ return (num(examMid) + num(examFinal)) * 0.25; }
+
+        // 標準排名（等同 Excel RANK.EQ）：同分同名次，下一名次依人數往後跳
+        function rankOf(value, allValues){ return 1 + allValues.filter(v => v > value).length; }
+
+        function state(){
+            if(!lastData) lastData = {};
+            if(!Array.isArray(lastData.students) || lastData.students.length === 0) lastData.students = DEFAULT_STUDENTS.map(s => ({ ...s }));
+            if(!lastData.className) lastData.className = DEFAULT_CLASS_NAME;
+            if(!lastData.scores) lastData.scores = {};
+            const sc = lastData.scores;
+            if(!sc.homework) sc.homework = {}; if(!sc.quiz) sc.quiz = {}; if(!sc.perform) sc.perform = {};
+            SUBJECTS.forEach(sub => {
+                [sc.homework, sc.quiz, sc.perform].forEach(bucket => {
+                    if(!bucket[sub]) bucket[sub] = {};
+                    if(!bucket[sub].mid) bucket[sub].mid = {};
+                    if(!bucket[sub].final) bucket[sub].final = {};
+                });
+            });
+            if(!sc.examMid) sc.examMid = {};
+            if(!sc.examFinal) sc.examFinal = {};
+            return lastData;
+        }
+
+        function saveLeaf(path, value){ const o = {}; deepSet(o, path, value); saveData(o); deepSet(lastData, path, value); }
+
+        /* ---------- 未登入畫面 ---------- */
+        function renderPublic(data, status){
+            $('appTitle').textContent = (data && data.className) || DEFAULT_CLASS_NAME;
+            const el = $('content');
+            if(isAdmin) { el.innerHTML = ''; return; }
+            if(status.error){
+                el.innerHTML = '<p class="empty-note">載入失敗，請重新整理頁面，或確認你已用授權的 Google 帳號登入。</p>';
+            } else {
+                el.innerHTML = '<p class="empty-note">這是班級成績登記工具，成績內容僅授權老師登入後可見。<br>請點右上角「登入」使用授權的 Google 帳號登入。</p>';
+            }
+        }
+
+        /* ---------- 登入後編輯區 ---------- */
+        let activeTab = 'roster';
+        let dailyPeriod = 'mid', dailySubject = '國語', examPeriod = 'mid';
+
+        function loadEditor(data){
+            editorReady = true;
+            state();
+            renderAdmin();
+        }
+
+        function renderAdmin(){
+            const root = $('adminArea');
+            root.innerHTML = `
+                <div class="tabs">
+                    <button class="tab-btn" data-tab="roster">學生名單</button>
+                    <button class="tab-btn" data-tab="daily">平時成績</button>
+                    <button class="tab-btn" data-tab="exam">段考成績</button>
+                    <button class="tab-btn" data-tab="summary">學期總成績</button>
+                </div>
+                <div class="tab-panel" data-panel="roster"></div>
+                <div class="tab-panel" data-panel="daily"></div>
+                <div class="tab-panel" data-panel="exam"></div>
+                <div class="tab-panel" data-panel="summary"></div>
+            `;
+            root.querySelectorAll('.tab-btn').forEach(b => b.onclick = () => { activeTab = b.dataset.tab; syncTabs(); });
+            renderRosterPanel(root.querySelector('[data-panel="roster"]'));
+            renderDailyPanel(root.querySelector('[data-panel="daily"]'));
+            renderExamPanel(root.querySelector('[data-panel="exam"]'));
+            renderSummaryPanel(root.querySelector('[data-panel="summary"]'));
+            syncTabs();
+        }
+        function syncTabs(){
+            const root = $('adminArea');
+            root.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === activeTab));
+            root.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.dataset.panel === activeTab));
+        }
+
+        /* ---------- 學生名單 ---------- */
+        function renderRosterPanel(el){
+            const data = state();
+            el.innerHTML = `
+                <div class="class-name-field">
+                    <label>班級名稱</label>
+                    <input type="text" id="classNameInput" value="${data.className}">
+                </div>
+                <div class="table-wrap">
+                    <table class="grid">
+                        <thead><tr><th>座號</th><th style="text-align:left">姓名</th><th>操作</th></tr></thead>
+                        <tbody id="rosterBody"></tbody>
+                    </table>
+                </div>
+                <div class="add-student-bar"><button class="btn" id="addStudentBtn">＋ 新增學生</button></div>
+            `;
+            el.querySelector('#classNameInput').onchange = e => saveLeaf(['className'], e.target.value.trim() || DEFAULT_CLASS_NAME);
+            const body = el.querySelector('#rosterBody');
+            data.students.forEach((s, idx) => {
+                const tr = document.createElement('tr');
+                tr.className = 'roster-row';
+                tr.innerHTML = `<td>${idx + 1}</td><td><input type="text" value="${s.name}"></td><td><button class="btn danger small">刪除</button></td>`;
+                tr.querySelector('input').onchange = e => {
+                    s.name = e.target.value.trim() || s.name;
+                    saveLeaf(['students'], data.students);
+                    renderDailyPanel($('adminArea').querySelector('[data-panel="daily"]'));
+                    renderExamPanel($('adminArea').querySelector('[data-panel="exam"]'));
+                    renderSummaryPanel($('adminArea').querySelector('[data-panel="summary"]'));
+                };
+                tr.querySelector('button').onclick = async () => {
+                    const ok = await askInput(`確定刪除「${s.name}」？輸入「刪除」以確認`, '');
+                    if(ok === '刪除'){
+                        data.students = data.students.filter(x => x.id !== s.id);
+                        saveLeaf(['students'], data.students);
+                        renderRosterPanel(el);
+                        renderDailyPanel($('adminArea').querySelector('[data-panel="daily"]'));
+                        renderExamPanel($('adminArea').querySelector('[data-panel="exam"]'));
+                        renderSummaryPanel($('adminArea').querySelector('[data-panel="summary"]'));
+                    }
+                };
+                body.appendChild(tr);
+            });
+            el.querySelector('#addStudentBtn').onclick = async () => {
+                const name = await askInput('請輸入新學生姓名', '');
+                if(name && name.trim()){
+                    const id = 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+                    data.students.push({ id, name: name.trim() });
+                    saveLeaf(['students'], data.students);
+                    renderRosterPanel(el);
+                    renderDailyPanel($('adminArea').querySelector('[data-panel="daily"]'));
+                    renderExamPanel($('adminArea').querySelector('[data-panel="exam"]'));
+                    renderSummaryPanel($('adminArea').querySelector('[data-panel="summary"]'));
+                }
+            };
+        }
+
+        /* ---------- 平時成績（作業/平考/表現） ---------- */
+        function renderDailyPanel(el){
+            const data = state();
+            el.innerHTML = `
+                <p class="hint-text">平時分數 ＝ 作業×0.4 ＋ 平考×0.4 ＋ 表現×0.2（各項請輸入 0–100 的已計算分數，即作業加總、平考平均、上課表現分數）</p>
+                <div class="toolbar">
+                    <label>科目</label>
+                    <select id="dailySubjectSel">${SUBJECTS.map(s => `<option value="${s}" ${s === dailySubject ? 'selected' : ''}>${s}</option>`).join('')}</select>
+                    <label>期別</label>
+                    <select id="dailyPeriodSel">${Object.entries(PERIODS).map(([k, v]) => `<option value="${k}" ${k === dailyPeriod ? 'selected' : ''}>${v}</option>`).join('')}</select>
+                </div>
+                <div class="table-wrap">
+                    <table class="grid">
+                        <thead><tr><th style="text-align:left">姓名</th><th>作業</th><th>平考</th><th>表現</th><th>平時分數</th></tr></thead>
+                        <tbody id="dailyBody"></tbody>
+                    </table>
+                </div>
+            `;
+            el.querySelector('#dailySubjectSel').onchange = e => { dailySubject = e.target.value; renderDailyPanel(el); };
+            el.querySelector('#dailyPeriodSel').onchange = e => { dailyPeriod = e.target.value; renderDailyPanel(el); };
+
+            const body = el.querySelector('#dailyBody');
+            const sc = data.scores;
+            data.students.forEach(s => {
+                const hw = getLeaf(sc.homework[dailySubject][dailyPeriod], s.id);
+                const qz = getLeaf(sc.quiz[dailySubject][dailyPeriod], s.id);
+                const pf = getLeaf(sc.perform[dailySubject][dailyPeriod], s.id);
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="name-cell">${s.name}</td>
+                    <td><input type="number" min="0" max="100" step="0.5" data-f="hw" value="${hw ?? ''}"></td>
+                    <td><input type="number" min="0" max="100" step="0.5" data-f="qz" value="${qz ?? ''}"></td>
+                    <td><input type="number" min="0" max="100" step="0.5" data-f="pf" value="${pf ?? ''}"></td>
+                    <td class="derived" data-f="out">${fmt(dailyScore100(hw || 0, qz || 0, pf || 0))}</td>
+                `;
+                const recalc = () => {
+                    const h = num(tr.querySelector('[data-f=hw]').value);
+                    const q = num(tr.querySelector('[data-f=qz]').value);
+                    const p = num(tr.querySelector('[data-f=pf]').value);
+                    tr.querySelector('[data-f=out]').textContent = fmt(dailyScore100(h, q, p));
+                };
+                tr.querySelector('[data-f=hw]').oninput = recalc;
+                tr.querySelector('[data-f=qz]').oninput = recalc;
+                tr.querySelector('[data-f=pf]').oninput = recalc;
+                tr.querySelector('[data-f=hw]').onchange = e => saveLeaf(['scores', 'homework', dailySubject, dailyPeriod, s.id], num(e.target.value));
+                tr.querySelector('[data-f=qz]').onchange = e => saveLeaf(['scores', 'quiz', dailySubject, dailyPeriod, s.id], num(e.target.value));
+                tr.querySelector('[data-f=pf]').onchange = e => saveLeaf(['scores', 'perform', dailySubject, dailyPeriod, s.id], num(e.target.value));
+                body.appendChild(tr);
+            });
+        }
+
+        /* ---------- 段考成績 ---------- */
+        function renderExamPanel(el){
+            const data = state();
+            el.innerHTML = `
+                <p class="hint-text">加權總分 ＝ 國語×5＋數學×4＋自然×3＋社會×3＋英文×2（用於班排名，比重沿用原始段考表）</p>
+                <div class="toolbar">
+                    <label>期別</label>
+                    <select id="examPeriodSel">${Object.entries(PERIODS).map(([k, v]) => `<option value="${k}" ${k === examPeriod ? 'selected' : ''}>${v}</option>`).join('')}</select>
+                </div>
+                <div class="table-wrap">
+                    <table class="grid">
+                        <thead><tr><th style="text-align:left">姓名</th>${ALL_SUBJECTS.map(s => `<th>${s}</th>`).join('')}<th>加權總分</th><th>排名</th></tr></thead>
+                        <tbody id="examBody"></tbody>
+                    </table>
+                </div>
+            `;
+            el.querySelector('#examPeriodSel').onchange = e => { examPeriod = e.target.value; renderExamPanel(el); };
+
+            const bucketKey = examPeriod === 'mid' ? 'examMid' : 'examFinal';
+            const body = el.querySelector('#examBody');
+            const bucket = data.scores[bucketKey];
+
+            function weightedTotal(sid){
+                return ALL_SUBJECTS.reduce((sum, sub) => sum + (getLeaf(bucket[sid], sub) || 0) * EXAM_WEIGHT[sub], 0);
+            }
+            const allTotals = data.students.map(s => weightedTotal(s.id));
+
+            data.students.forEach((s, idx) => {
+                const rec = bucket[s.id] || {};
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="name-cell">${s.name}</td>
+                    ${ALL_SUBJECTS.map(sub => `<td><input type="number" min="0" max="100" step="0.5" data-sub="${sub}" value="${getLeaf(rec, sub) ?? ''}"></td>`).join('')}
+                    <td class="derived" data-f="total">${fmt(allTotals[idx])}</td>
+                    <td class="rank-cell" data-f="rank">${rankOf(allTotals[idx], allTotals)}</td>
+                `;
+                ALL_SUBJECTS.forEach(sub => {
+                    const inp = tr.querySelector(`[data-sub="${sub}"]`);
+                    const recalcRow = () => {
+                        const vals = ALL_SUBJECTS.map(k => num(tr.querySelector(`[data-sub="${k}"]`).value));
+                        const total = ALL_SUBJECTS.reduce((sum, k, i) => sum + vals[i] * EXAM_WEIGHT[k], 0);
+                        tr.querySelector('[data-f=total]').textContent = fmt(total);
+                    };
+                    inp.oninput = recalcRow;
+                    inp.onchange = e => {
+                        saveLeaf(['scores', bucketKey, s.id, sub], num(e.target.value));
+                        renderExamPanel(el); // 重新排名（會重繪表格，但此為 change 事件不影響輸入中焦點）
+                    };
+                });
+                body.appendChild(tr);
+            });
+        }
+
+        /* ---------- 學期總成績（唯讀彙總） ---------- */
+        function renderSummaryPanel(el){
+            const data = state();
+            const sc = data.scores;
+            let html = '';
+
+            SUBJECTS.forEach(sub => {
+                html += `<div class="section-title">${sub}</div>
+                <div class="table-wrap"><table class="grid">
+                <thead><tr><th style="text-align:left">姓名</th><th>平時(50)</th><th>段考(50)</th><th>總分</th><th>等第</th><th>努力程度</th></tr></thead>
+                <tbody>`;
+                data.students.forEach(s => {
+                    const midHW = getLeaf(sc.homework[sub].mid, s.id) || 0, midQZ = getLeaf(sc.quiz[sub].mid, s.id) || 0, midPF = getLeaf(sc.perform[sub].mid, s.id) || 0;
+                    const finHW = getLeaf(sc.homework[sub].final, s.id) || 0, finQZ = getLeaf(sc.quiz[sub].final, s.id) || 0, finPF = getLeaf(sc.perform[sub].final, s.id) || 0;
+                    const midScore = dailyScore100(midHW, midQZ, midPF);
+                    const finScore = dailyScore100(finHW, finQZ, finPF);
+                    const d50 = daily50(midScore, finScore);
+                    const examMid = getLeaf(sc.examMid[s.id], sub) || 0;
+                    const examFinal = getLeaf(sc.examFinal[s.id], sub) || 0;
+                    const e50 = examPart50(examMid, examFinal);
+                    const total = d50 + e50;
+                    html += `<tr><td class="name-cell">${s.name}</td><td>${fmt(d50)}</td><td>${fmt(e50)}</td><td class="derived">${fmt(total)}</td><td>${letterGrade(total)}</td><td>${effortLevel(d50)}</td></tr>`;
+                });
+                html += `</tbody></table></div>`;
+            });
+
+            EXAM_ONLY.forEach(sub => {
+                html += `<div class="section-title">${sub}（僅段考）</div>
+                <div class="table-wrap"><table class="grid">
+                <thead><tr><th style="text-align:left">姓名</th><th>期中</th><th>期末</th><th>平均</th></tr></thead>
+                <tbody>`;
+                data.students.forEach(s => {
+                    const mid = getLeaf(sc.examMid[s.id], sub);
+                    const fin = getLeaf(sc.examFinal[s.id], sub);
+                    const avg = (mid !== null || fin !== null) ? ((mid || 0) + (fin || 0)) / ((mid !== null ? 1 : 0) + (fin !== null ? 1 : 0) || 1) : null;
+                    html += `<tr><td class="name-cell">${s.name}</td><td>${mid ?? '-'}</td><td>${fin ?? '-'}</td><td class="derived">${avg !== null ? fmt(avg) : '-'}</td></tr>`;
+                });
+                html += `</tbody></table></div>`;
+            });
+
+            el.innerHTML = html;
+        }
+        /* ========================================================= */
+    </script>
+</body>
+</html>
