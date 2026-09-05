@@ -65,12 +65,18 @@
         .btn.outline { background: transparent; color: var(--accent); }
         .btn.small { padding: 5px 14px; font-size: 0.85em; }
         .btn.danger { border-color: var(--danger); background: var(--danger); }
+        .icon-btn { border: none; background: transparent; color: var(--accent); cursor: pointer; font-size: 0.55em; vertical-align: middle; padding: 4px 8px; border-radius: 50%; }
+        .icon-btn:hover { background: color-mix(in srgb, var(--accent) 15%, transparent); }
 
         .admin-only.hidden { display: none; }
 
         /* ---- 業務樣式 ---- */
-        header { display: flex; align-items: center; justify-content: space-between; padding: 18px 24px; border-bottom: 2px solid var(--line); flex-wrap: wrap; gap: 10px; }
-        header h1 { font-size: 1.5em; margin: 0; }
+        header { border-bottom: 2px solid var(--line); padding: 14px 16px; }
+        .header-inner { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; max-width: 1100px; margin: 0 auto; }
+        .header-side { display: flex; align-items: center; }
+        .header-actions { justify-self: end; }
+        .header-title { justify-self: center; text-align: center; }
+        .header-title h1 { font-size: 1.5em; margin: 0; white-space: nowrap; }
         main, #adminArea { max-width: 1100px; margin: 0 auto; padding: 20px 16px 60px; }
 
         .empty-note { text-align: center; color: var(--muted); padding: 60px 20px; font-size: 1.1em; }
@@ -81,8 +87,12 @@
         .tab-panel { display: none; }
         .tab-panel.active { display: block; }
 
+        .subtabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+        .subtab-btn { padding: 6px 16px; border-radius: 50px; border: 2px solid var(--line); background: var(--surface); color: var(--text); font-family: inherit; cursor: pointer; font-size: 0.88em; }
+        .subtab-btn.active { border-color: var(--accent-dark); background: color-mix(in srgb, var(--accent) 18%, var(--surface)); color: var(--accent-dark); font-weight: bold; }
+
         .toolbar { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
-        .toolbar select { padding: 8px 14px; border-radius: 10px; border: 2px solid var(--line); background: var(--surface); color: var(--text); font-family: inherit; font-size: 0.95em; }
+        .toolbar select, .toolbar input[type=text] { padding: 8px 14px; border-radius: 10px; border: 2px solid var(--line); background: var(--surface); color: var(--text); font-family: inherit; font-size: 0.95em; }
         .toolbar label { font-size: 0.9em; color: var(--muted); }
 
         .table-wrap { overflow-x: auto; border: 2px solid var(--line); border-radius: 14px; background: var(--surface); }
@@ -93,10 +103,12 @@
         table.grid tr:last-child td { border-bottom: none; }
         table.grid input[type=number] { width: 70px; padding: 6px 4px; border: 2px solid var(--line); border-radius: 8px; text-align: center; font-family: inherit; font-size: 0.95em; background: var(--surface); color: var(--text); }
         table.grid input[type=number]:focus { border-color: var(--accent); box-shadow: 0 0 8px 2px var(--focus-glow); outline: none; }
-        table.grid input[type=text] { padding: 6px 10px; border: 2px solid var(--line); border-radius: 8px; font-family: inherit; font-size: 0.95em; background: var(--surface); color: var(--text); width: 140px; }
+        table.grid input[type=text] { padding: 6px 10px; border: 2px solid var(--line); border-radius: 8px; font-family: inherit; font-size: 0.95em; background: var(--surface); color: var(--text); width: 120px; }
         table.grid input[type=text]:focus { border-color: var(--accent); box-shadow: 0 0 8px 2px var(--focus-glow); outline: none; }
+        table.grid th input[type=text] { width: 100px; text-align: center; }
         td.derived { font-weight: bold; color: var(--accent-dark); }
         td.rank-cell { font-weight: bold; }
+        .col-del-btn { border: none; background: transparent; color: var(--danger); cursor: pointer; font-size: 0.85em; margin-left: 4px; }
 
         .section-title { font-size: 1.15em; margin: 26px 0 10px; padding-bottom: 6px; border-bottom: 2px solid var(--line); }
         .section-title:first-child { margin-top: 0; }
@@ -109,15 +121,28 @@
         .class-name-field input[type=text]:focus { border-color: var(--accent); box-shadow: 0 0 8px 2px var(--focus-glow); outline: none; }
 
         .hint-text { color: var(--muted); font-size: 0.85em; margin: -6px 0 16px; }
+
+        .add-col-bar { display: flex; justify-content: flex-end; margin-top: 12px; }
+
+        .subject-manage-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+        .subject-manage-row:last-child { border-bottom: none; }
+        .subject-add-form { display: flex; align-items: center; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+        .subject-add-form input[type=text] { padding: 8px 14px; border: 2px solid var(--line); border-radius: 10px; font-family: inherit; background: var(--surface); color: var(--text); }
+        .subject-add-form select { padding: 8px 14px; border: 2px solid var(--line); border-radius: 10px; font-family: inherit; background: var(--surface); color: var(--text); }
     </style>
 </head>
 <body>
     <!-- ====== 版面骨架 ====== -->
     <header>
-        <h1 data-gated><span id="appTitle">608</span>成績計算</h1>
-        <div>
-            <button id="loginBtn" class="btn outline">登入</button>
-            <button id="logoutBtn" class="btn outline admin-only hidden">登出</button>
+        <div class="header-inner">
+            <div class="header-side"></div>
+            <div class="header-title" data-gated>
+                <h1><span id="appTitle">608</span>成績計算 <button id="editClassBtn" class="icon-btn admin-only hidden" title="修改班級名稱">✎ 改名</button></h1>
+            </div>
+            <div class="header-side header-actions">
+                <button id="loginBtn" class="btn outline">登入</button>
+                <button id="logoutBtn" class="btn outline admin-only hidden">登出</button>
+            </div>
         </div>
     </header>
 
@@ -272,14 +297,15 @@
 
         /* ========== 業務邏輯 ========== */
 
-        // 有完整「平時成績」明細（作業+平考+表現）的科目
-        const SUBJECTS = ['國語', '數學'];
-        // 只登記段考分數、無平時明細的科目
+        // 有段考的固定科目（主科：平時+段考）
+        const CORE_SUBJECTS = ['國語', '數學'];
+        // 只登記段考分數、無平時明細的固定科目
         const EXAM_ONLY = ['自然', '社會', '英文'];
-        const ALL_SUBJECTS = [...SUBJECTS, ...EXAM_ONLY];
-        // 段考加權排名用的科目權重（沿用原始段考成績表的比重）
+        const EXAM_SUBJECTS = [...CORE_SUBJECTS, ...EXAM_ONLY]; // 段考成績頁使用
         const EXAM_WEIGHT = { 國語: 5, 數學: 4, 自然: 3, 社會: 3, 英文: 2 };
         const PERIODS = { mid: '期中', final: '期末' };
+        const CATEGORY_LABEL = { homework: '作業', quiz: '平考', perform: '上課表現' };
+        const CATEGORY_KEYS = ['homework', 'quiz', 'perform'];
 
         const DEFAULT_CLASS_NAME = '608';
         const DEFAULT_STUDENTS = ['陳愷寬','盧信睿','蔡杰助','李秉澤','鍾丞崴','郭宥均','朱子安','葉峻榮','翁士賢','高以恩',
@@ -291,45 +317,80 @@
 
         // 等第（依總分 0-100）
         function letterGrade(total){ if(total >= 90) return '優'; if(total >= 80) return '甲'; if(total >= 70) return '乙'; if(total >= 60) return '丙'; return '丁'; }
-        // 努力程度（依平時分數 0-50 制）
-        function effortLevel(daily50){ if(daily50 >= 45) return '優異'; if(daily50 >= 42.5) return '良好'; if(daily50 >= 40) return '尚可'; return '再加油'; }
+        // 努力程度：主科依平時 0-50 制門檻；無段考科目依 0-100 制門檻（比例相同、門檻加倍）
+        function effortLevel50(daily50){ if(daily50 >= 45) return '優異'; if(daily50 >= 42.5) return '良好'; if(daily50 >= 40) return '尚可'; return '再加油'; }
+        function effortLevel100(daily100){ if(daily100 >= 90) return '優異'; if(daily100 >= 85) return '良好'; if(daily100 >= 80) return '尚可'; return '再加油'; }
 
-        // 由 obj[sid] 取分數，未輸入視為 0（與原始 Excel 空白視為 0 一致）
-        function getLeaf(obj, sid){ return obj && obj[sid] !== undefined && obj[sid] !== null && obj[sid] !== '' ? Number(obj[sid]) : null; }
-
-        function deepGet(data, path){ let o = data; for(const k of path){ if(o == null) return undefined; o = o[k]; } return o; }
+        function getLeaf(obj, key){ return obj && obj[key] !== undefined && obj[key] !== null && obj[key] !== '' ? Number(obj[key]) : null; }
         function deepSet(obj, path, value){ let o = obj; for(let i = 0; i < path.length - 1; i++){ if(!o[path[i]]) o[path[i]] = {}; o = o[path[i]]; } o[path[path.length - 1]] = value; }
 
-        // 平時分數（0-100 制）＝ 作業*0.4 ＋ 平考*0.4 ＋ 表現*0.2　（等同「(作業20%+平考20%+表現10%)*2」）
-        function dailyScore100(homework, quiz, perform){ return num(homework) * 0.4 + num(quiz) * 0.4 + num(perform) * 0.2; }
-        // 平時（50 制，學期用）＝ (期中100制 + 期末100制) / 4
-        function daily50(midScore100, finalScore100){ return (num(midScore100) + num(finalScore100)) / 4; }
-        // 段考（50 制，學期用）＝ (期中分 + 期末分) * 0.25
-        function examPart50(examMid, examFinal){ return (num(examMid) + num(examFinal)) * 0.25; }
-
-        // 標準排名（等同 Excel RANK.EQ）：同分同名次，下一名次依人數往後跳
+        // 段考標準排名（等同 Excel RANK.EQ）：同分同名次，下一名次依人數往後跳
         function rankOf(value, allValues){ return 1 + allValues.filter(v => v > value).length; }
+
+        function newId(prefix){ return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+        /* ---------- 科目清單（固定主科／段考科 + 自訂科目） ---------- */
+        // 自訂科目結構：{ id, name, periodMode: 'split' | 'single' }
+        function customSubjects(){ return state().subjects.custom; }
+        // 平時成績頁可選的科目清單（含主科＋自訂科目），統一格式 {key,name,periodMode,hasExam}
+        function dailySubjectList(){
+            return [
+                ...CORE_SUBJECTS.map(name => ({ key: name, name, periodMode: 'split', hasExam: true })),
+                ...customSubjects().map(c => ({ key: c.id, name: c.name, periodMode: c.periodMode, hasExam: false }))
+            ];
+        }
+        function findDailySubject(key){ return dailySubjectList().find(s => s.key === key); }
+
+        /* ---------- 資料骨架初始化 ---------- */
+        function emptyCategoryBucket(){ return { columns: [], values: {} }; }
+        function ensureDailyBucket(subjectKey, periodKey){
+            // 注意：假設 lastData 已由 state() 初始化過，這裡直接操作 lastData，避免與 state() 互相遞迴
+            const sc = lastData.scores;
+            if(!sc.daily[subjectKey]) sc.daily[subjectKey] = {};
+            if(!sc.daily[subjectKey][periodKey]) sc.daily[subjectKey][periodKey] = {};
+            const b = sc.daily[subjectKey][periodKey];
+            CATEGORY_KEYS.forEach(cat => { if(!b[cat]) b[cat] = emptyCategoryBucket(); if(!b[cat].columns) b[cat].columns = []; if(!b[cat].values) b[cat].values = {}; });
+            return b;
+        }
 
         function state(){
             if(!lastData) lastData = {};
             if(!Array.isArray(lastData.students) || lastData.students.length === 0) lastData.students = DEFAULT_STUDENTS.map(s => ({ ...s }));
             if(!lastData.className) lastData.className = DEFAULT_CLASS_NAME;
+            if(!lastData.subjects) lastData.subjects = {};
+            if(!Array.isArray(lastData.subjects.custom)) lastData.subjects.custom = [];
             if(!lastData.scores) lastData.scores = {};
-            const sc = lastData.scores;
-            if(!sc.homework) sc.homework = {}; if(!sc.quiz) sc.quiz = {}; if(!sc.perform) sc.perform = {};
-            SUBJECTS.forEach(sub => {
-                [sc.homework, sc.quiz, sc.perform].forEach(bucket => {
-                    if(!bucket[sub]) bucket[sub] = {};
-                    if(!bucket[sub].mid) bucket[sub].mid = {};
-                    if(!bucket[sub].final) bucket[sub].final = {};
-                });
+            if(!lastData.scores.daily) lastData.scores.daily = {};
+            if(!lastData.scores.examMid) lastData.scores.examMid = {};
+            if(!lastData.scores.examFinal) lastData.scores.examFinal = {};
+            // 確保所有目前已知科目都有骨架（含期中/期末或單一期）－直接用固定科目＋自訂科目清單，避免呼叫 dailySubjectList() 造成遞迴
+            const subjectSkeletonList = [
+                ...CORE_SUBJECTS.map(name => ({ key: name, periodMode: 'split' })),
+                ...lastData.subjects.custom.map(c => ({ key: c.id, periodMode: c.periodMode }))
+            ];
+            subjectSkeletonList.forEach(sub => {
+                if(sub.periodMode === 'split'){ ensureDailyBucket(sub.key, 'mid'); ensureDailyBucket(sub.key, 'final'); }
+                else { ensureDailyBucket(sub.key, 'single'); }
             });
-            if(!sc.examMid) sc.examMid = {};
-            if(!sc.examFinal) sc.examFinal = {};
             return lastData;
         }
 
         function saveLeaf(path, value){ const o = {}; deepSet(o, path, value); saveData(o); deepSet(lastData, path, value); }
+
+        // 類別平均：只平均「有填入」的欄位分數（0-100），皆未填則回傳 0（用於平時分數計算）
+        function categoryAverage(bucket, sid){
+            if(!bucket || !bucket.columns.length) return null;
+            const vals = bucket.columns.map(c => getLeaf(bucket.values[sid], c.id)).filter(v => v !== null);
+            if(!vals.length) return null;
+            return vals.reduce((a, b) => a + b, 0) / vals.length;
+        }
+        // 平時分數(0-100) = 作業平均*0.4 + 平考平均*0.4 + 表現平均*0.2（未填的類別以 0 計入加權）
+        function dailyScore100FromBucket(bucket, sid){
+            const hw = categoryAverage(bucket.homework, sid);
+            const qz = categoryAverage(bucket.quiz, sid);
+            const pf = categoryAverage(bucket.perform, sid);
+            return (hw || 0) * 0.4 + (qz || 0) * 0.4 + (pf || 0) * 0.2;
+        }
 
         /* ---------- 未登入畫面 ---------- */
         function renderPublic(data, status){
@@ -343,9 +404,17 @@
             }
         }
 
+        /* ---------- 班級名稱：標題旁鉛筆按鈕 ---------- */
+        $('editClassBtn').onclick = async () => {
+            const d = state();
+            const name = await askInput('請輸入班級名稱', d.className);
+            if(name && name.trim()){ saveLeaf(['className'], name.trim()); $('appTitle').textContent = name.trim(); }
+        };
+
         /* ---------- 登入後編輯區 ---------- */
-        let activeTab = 'roster';
-        let dailyPeriod = 'mid', dailySubject = '國語', examPeriod = 'mid';
+        let activeTab = 'daily';
+        let dailySubjectKey = '國語', dailyPeriod = 'mid', dailyCategoryTab = 'homework';
+        let examPeriod = 'mid';
 
         function loadEditor(data){
             editorReady = true;
@@ -353,25 +422,24 @@
             renderAdmin();
         }
 
+        const TABS = [
+            { key: 'daily', label: '平時成績' },
+            { key: 'exam', label: '段考成績' },
+            { key: 'summary', label: '學期總成績' },
+            { key: 'roster', label: '學生名單' }
+        ];
+
         function renderAdmin(){
             const root = $('adminArea');
             root.innerHTML = `
-                <div class="tabs">
-                    <button class="tab-btn" data-tab="roster">學生名單</button>
-                    <button class="tab-btn" data-tab="daily">平時成績</button>
-                    <button class="tab-btn" data-tab="exam">段考成績</button>
-                    <button class="tab-btn" data-tab="summary">學期總成績</button>
-                </div>
-                <div class="tab-panel" data-panel="roster"></div>
-                <div class="tab-panel" data-panel="daily"></div>
-                <div class="tab-panel" data-panel="exam"></div>
-                <div class="tab-panel" data-panel="summary"></div>
+                <div class="tabs">${TABS.map(t => `<button class="tab-btn" data-tab="${t.key}">${t.label}</button>`).join('')}</div>
+                ${TABS.map(t => `<div class="tab-panel" data-panel="${t.key}"></div>`).join('')}
             `;
             root.querySelectorAll('.tab-btn').forEach(b => b.onclick = () => { activeTab = b.dataset.tab; syncTabs(); });
-            renderRosterPanel(root.querySelector('[data-panel="roster"]'));
             renderDailyPanel(root.querySelector('[data-panel="daily"]'));
             renderExamPanel(root.querySelector('[data-panel="exam"]'));
             renderSummaryPanel(root.querySelector('[data-panel="summary"]'));
+            renderRosterPanel(root.querySelector('[data-panel="roster"]'));
             syncTabs();
         }
         function syncTabs(){
@@ -379,112 +447,128 @@
             root.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === activeTab));
             root.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.dataset.panel === activeTab));
         }
+        function refreshAllPanels(){
+            const root = $('adminArea');
+            renderDailyPanel(root.querySelector('[data-panel="daily"]'));
+            renderExamPanel(root.querySelector('[data-panel="exam"]'));
+            renderSummaryPanel(root.querySelector('[data-panel="summary"]'));
+        }
 
-        /* ---------- 學生名單 ---------- */
-        function renderRosterPanel(el){
+        /* ---------- 平時成績（作業/平考/表現/彙總 四個子頁） ---------- */
+        function renderDailyPanel(el){
             const data = state();
+            const subjects = dailySubjectList();
+            if(!findDailySubject(dailySubjectKey)) dailySubjectKey = subjects[0].key;
+            const sub = findDailySubject(dailySubjectKey);
+            if(sub.periodMode === 'single') dailyPeriod = 'single';
+            else if(dailyPeriod === 'single') dailyPeriod = 'mid';
+
             el.innerHTML = `
-                <div class="class-name-field">
-                    <label>班級名稱</label>
-                    <input type="text" id="classNameInput" value="${data.className}">
+                <div class="toolbar">
+                    <label>科目</label>
+                    <select id="dailySubjectSel">${subjects.map(s => `<option value="${s.key}" ${s.key === dailySubjectKey ? 'selected' : ''}>${s.name}</option>`).join('')}</select>
+                    ${sub.periodMode === 'split' ? `
+                    <label>期別</label>
+                    <select id="dailyPeriodSel">${Object.entries(PERIODS).map(([k, v]) => `<option value="${k}" ${k === dailyPeriod ? 'selected' : ''}>${v}</option>`).join('')}</select>
+                    ` : `<span class="hint-text" style="margin:0">此科目為一學期登記一次</span>`}
                 </div>
+                <div class="subtabs">
+                    <button class="subtab-btn" data-cat="homework">1 作業</button>
+                    <button class="subtab-btn" data-cat="quiz">2 平考</button>
+                    <button class="subtab-btn" data-cat="perform">3 上課表現</button>
+                    <button class="subtab-btn" data-cat="__summary">4 平時分數</button>
+                </div>
+                <div id="dailyCategoryArea"></div>
+            `;
+            el.querySelector('#dailySubjectSel').onchange = e => { dailySubjectKey = e.target.value; renderDailyPanel(el); };
+            const periodSel = el.querySelector('#dailyPeriodSel');
+            if(periodSel) periodSel.onchange = e => { dailyPeriod = e.target.value; renderDailyPanel(el); };
+
+            el.querySelectorAll('.subtab-btn').forEach(b => b.onclick = () => { dailyCategoryTab = b.dataset.cat; renderDailyCategoryArea(el); });
+            renderDailyCategoryArea(el);
+        }
+
+        function renderDailyCategoryArea(el){
+            el.querySelectorAll('.subtab-btn').forEach(b => b.classList.toggle('active', b.dataset.cat === dailyCategoryTab));
+            const area = el.querySelector('#dailyCategoryArea');
+            const data = state();
+            const bucket = ensureDailyBucket(dailySubjectKey, dailyPeriod);
+
+            if(dailyCategoryTab === '__summary'){ renderDailySummarySub(area, data, bucket); return; }
+            renderDailyCategorySub(area, data, bucket, dailyCategoryTab);
+        }
+
+        function renderDailyCategorySub(area, data, bucket, cat){
+            const catBucket = bucket[cat];
+            area.innerHTML = `
+                <p class="hint-text">每一欄可自訂名稱（例如「第1次習作」），成績以 0–100 分登記；學生的「平均」為該生已填欄位的平均分數。</p>
                 <div class="table-wrap">
                     <table class="grid">
-                        <thead><tr><th>座號</th><th style="text-align:left">姓名</th><th>操作</th></tr></thead>
-                        <tbody id="rosterBody"></tbody>
+                        <thead><tr><th style="text-align:left">姓名</th>${catBucket.columns.map(c => `<th><input type="text" data-col="${c.id}" value="${escapeHtml(c.name)}"><button class="col-del-btn" data-col="${c.id}" title="刪除此欄">✕</button></th>`).join('')}<th>平均</th></tr></thead>
+                        <tbody id="catBody"></tbody>
                     </table>
                 </div>
-                <div class="add-student-bar"><button class="btn" id="addStudentBtn">＋ 新增學生</button></div>
+                <div class="add-col-bar"><button class="btn small" id="addColBtn">＋ 新增${CATEGORY_LABEL[cat]}項目</button></div>
             `;
-            el.querySelector('#classNameInput').onchange = e => saveLeaf(['className'], e.target.value.trim() || DEFAULT_CLASS_NAME);
-            const body = el.querySelector('#rosterBody');
-            data.students.forEach((s, idx) => {
+            const body = area.querySelector('#catBody');
+            data.students.forEach(s => {
+                const avg = categoryAverage(catBucket, s.id);
                 const tr = document.createElement('tr');
-                tr.className = 'roster-row';
-                tr.innerHTML = `<td>${idx + 1}</td><td><input type="text" value="${s.name}"></td><td><button class="btn danger small">刪除</button></td>`;
-                tr.querySelector('input').onchange = e => {
-                    s.name = e.target.value.trim() || s.name;
-                    saveLeaf(['students'], data.students);
-                    renderDailyPanel($('adminArea').querySelector('[data-panel="daily"]'));
-                    renderExamPanel($('adminArea').querySelector('[data-panel="exam"]'));
-                    renderSummaryPanel($('adminArea').querySelector('[data-panel="summary"]'));
-                };
-                tr.querySelector('button').onclick = async () => {
-                    const ok = await askInput(`確定刪除「${s.name}」？輸入「刪除」以確認`, '');
-                    if(ok === '刪除'){
-                        data.students = data.students.filter(x => x.id !== s.id);
-                        saveLeaf(['students'], data.students);
-                        renderRosterPanel(el);
-                        renderDailyPanel($('adminArea').querySelector('[data-panel="daily"]'));
-                        renderExamPanel($('adminArea').querySelector('[data-panel="exam"]'));
-                        renderSummaryPanel($('adminArea').querySelector('[data-panel="summary"]'));
-                    }
-                };
+                tr.innerHTML = `<td class="name-cell">${escapeHtml(s.name)}</td>${catBucket.columns.map(c => `<td><input type="number" min="0" max="100" step="0.5" data-col="${c.id}" value="${getLeaf(catBucket.values[s.id], c.id) ?? ''}"></td>`).join('')}<td class="derived" data-f="avg">${avg !== null ? fmt(avg) : '-'}</td>`;
+                catBucket.columns.forEach(c => {
+                    const inp = tr.querySelector(`input[data-col="${c.id}"]`);
+                    inp.oninput = () => {
+                        const vals = catBucket.columns.map(cc => { const v = tr.querySelector(`input[data-col="${cc.id}"]`).value; return v === '' ? null : num(v); }).filter(v => v !== null);
+                        tr.querySelector('[data-f=avg]').textContent = vals.length ? fmt(vals.reduce((a,b)=>a+b,0)/vals.length) : '-';
+                    };
+                    inp.onchange = e => {
+                        const v = e.target.value;
+                        if(!catBucket.values[s.id]) catBucket.values[s.id] = {};
+                        catBucket.values[s.id][c.id] = v === '' ? null : num(v);
+                        saveLeaf(['scores', 'daily', dailySubjectKey, dailyPeriod, cat, 'values', s.id], catBucket.values[s.id]);
+                    };
+                });
                 body.appendChild(tr);
             });
-            el.querySelector('#addStudentBtn').onclick = async () => {
-                const name = await askInput('請輸入新學生姓名', '');
+            area.querySelectorAll('.col-del-btn').forEach(btn => btn.onclick = async () => {
+                const ok = await askInput('確定刪除這一欄？輸入「刪除」以確認', '');
+                if(ok === '刪除'){
+                    catBucket.columns = catBucket.columns.filter(c => c.id !== btn.dataset.col);
+                    saveLeaf(['scores', 'daily', dailySubjectKey, dailyPeriod, cat, 'columns'], catBucket.columns);
+                    renderDailyCategorySub(area, data, bucket, cat);
+                }
+            });
+            area.querySelectorAll('th input[type=text]').forEach(inp => inp.onchange = e => {
+                const colId = inp.dataset.col;
+                const col = catBucket.columns.find(c => c.id === colId);
+                if(col){ col.name = e.target.value.trim() || col.name; saveLeaf(['scores', 'daily', dailySubjectKey, dailyPeriod, cat, 'columns'], catBucket.columns); }
+            });
+            area.querySelector('#addColBtn').onclick = async () => {
+                const name = await askInput(`請輸入${CATEGORY_LABEL[cat]}項目名稱`, `${CATEGORY_LABEL[cat]}${catBucket.columns.length + 1}`);
                 if(name && name.trim()){
-                    const id = 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
-                    data.students.push({ id, name: name.trim() });
-                    saveLeaf(['students'], data.students);
-                    renderRosterPanel(el);
-                    renderDailyPanel($('adminArea').querySelector('[data-panel="daily"]'));
-                    renderExamPanel($('adminArea').querySelector('[data-panel="exam"]'));
-                    renderSummaryPanel($('adminArea').querySelector('[data-panel="summary"]'));
+                    catBucket.columns.push({ id: newId('c'), name: name.trim() });
+                    saveLeaf(['scores', 'daily', dailySubjectKey, dailyPeriod, cat, 'columns'], catBucket.columns);
+                    renderDailyCategorySub(area, data, bucket, cat);
                 }
             };
         }
 
-        /* ---------- 平時成績（作業/平考/表現） ---------- */
-        function renderDailyPanel(el){
-            const data = state();
-            el.innerHTML = `
-                <p class="hint-text">平時分數 ＝ 作業×0.4 ＋ 平考×0.4 ＋ 表現×0.2（各項請輸入 0–100 的已計算分數，即作業加總、平考平均、上課表現分數）</p>
-                <div class="toolbar">
-                    <label>科目</label>
-                    <select id="dailySubjectSel">${SUBJECTS.map(s => `<option value="${s}" ${s === dailySubject ? 'selected' : ''}>${s}</option>`).join('')}</select>
-                    <label>期別</label>
-                    <select id="dailyPeriodSel">${Object.entries(PERIODS).map(([k, v]) => `<option value="${k}" ${k === dailyPeriod ? 'selected' : ''}>${v}</option>`).join('')}</select>
-                </div>
+        function renderDailySummarySub(area, data, bucket){
+            area.innerHTML = `
+                <p class="hint-text">平時分數 ＝ 作業平均×0.4 ＋ 平考平均×0.4 ＋ 上課表現平均×0.2</p>
                 <div class="table-wrap">
                     <table class="grid">
-                        <thead><tr><th style="text-align:left">姓名</th><th>作業</th><th>平考</th><th>表現</th><th>平時分數</th></tr></thead>
-                        <tbody id="dailyBody"></tbody>
+                        <thead><tr><th style="text-align:left">姓名</th><th>作業平均</th><th>平考平均</th><th>表現平均</th><th>平時分數</th></tr></thead>
+                        <tbody>${data.students.map(s => {
+                            const hw = categoryAverage(bucket.homework, s.id);
+                            const qz = categoryAverage(bucket.quiz, s.id);
+                            const pf = categoryAverage(bucket.perform, s.id);
+                            const total = dailyScore100FromBucket(bucket, s.id);
+                            return `<tr><td class="name-cell">${escapeHtml(s.name)}</td><td>${hw !== null ? fmt(hw) : '-'}</td><td>${qz !== null ? fmt(qz) : '-'}</td><td>${pf !== null ? fmt(pf) : '-'}</td><td class="derived">${fmt(total)}</td></tr>`;
+                        }).join('')}</tbody>
                     </table>
                 </div>
             `;
-            el.querySelector('#dailySubjectSel').onchange = e => { dailySubject = e.target.value; renderDailyPanel(el); };
-            el.querySelector('#dailyPeriodSel').onchange = e => { dailyPeriod = e.target.value; renderDailyPanel(el); };
-
-            const body = el.querySelector('#dailyBody');
-            const sc = data.scores;
-            data.students.forEach(s => {
-                const hw = getLeaf(sc.homework[dailySubject][dailyPeriod], s.id);
-                const qz = getLeaf(sc.quiz[dailySubject][dailyPeriod], s.id);
-                const pf = getLeaf(sc.perform[dailySubject][dailyPeriod], s.id);
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td class="name-cell">${s.name}</td>
-                    <td><input type="number" min="0" max="100" step="0.5" data-f="hw" value="${hw ?? ''}"></td>
-                    <td><input type="number" min="0" max="100" step="0.5" data-f="qz" value="${qz ?? ''}"></td>
-                    <td><input type="number" min="0" max="100" step="0.5" data-f="pf" value="${pf ?? ''}"></td>
-                    <td class="derived" data-f="out">${fmt(dailyScore100(hw || 0, qz || 0, pf || 0))}</td>
-                `;
-                const recalc = () => {
-                    const h = num(tr.querySelector('[data-f=hw]').value);
-                    const q = num(tr.querySelector('[data-f=qz]').value);
-                    const p = num(tr.querySelector('[data-f=pf]').value);
-                    tr.querySelector('[data-f=out]').textContent = fmt(dailyScore100(h, q, p));
-                };
-                tr.querySelector('[data-f=hw]').oninput = recalc;
-                tr.querySelector('[data-f=qz]').oninput = recalc;
-                tr.querySelector('[data-f=pf]').oninput = recalc;
-                tr.querySelector('[data-f=hw]').onchange = e => saveLeaf(['scores', 'homework', dailySubject, dailyPeriod, s.id], num(e.target.value));
-                tr.querySelector('[data-f=qz]').onchange = e => saveLeaf(['scores', 'quiz', dailySubject, dailyPeriod, s.id], num(e.target.value));
-                tr.querySelector('[data-f=pf]').onchange = e => saveLeaf(['scores', 'perform', dailySubject, dailyPeriod, s.id], num(e.target.value));
-                body.appendChild(tr);
-            });
         }
 
         /* ---------- 段考成績 ---------- */
@@ -498,7 +582,7 @@
                 </div>
                 <div class="table-wrap">
                     <table class="grid">
-                        <thead><tr><th style="text-align:left">姓名</th>${ALL_SUBJECTS.map(s => `<th>${s}</th>`).join('')}<th>加權總分</th><th>排名</th></tr></thead>
+                        <thead><tr><th style="text-align:left">姓名</th>${EXAM_SUBJECTS.map(s => `<th>${s}</th>`).join('')}<th>加權總分</th><th>排名</th></tr></thead>
                         <tbody id="examBody"></tbody>
                     </table>
                 </div>
@@ -510,7 +594,7 @@
             const bucket = data.scores[bucketKey];
 
             function weightedTotal(sid){
-                return ALL_SUBJECTS.reduce((sum, sub) => sum + (getLeaf(bucket[sid], sub) || 0) * EXAM_WEIGHT[sub], 0);
+                return EXAM_SUBJECTS.reduce((sum, sub) => sum + (getLeaf(bucket[sid], sub) || 0) * EXAM_WEIGHT[sub], 0);
             }
             const allTotals = data.students.map(s => weightedTotal(s.id));
 
@@ -518,70 +602,174 @@
                 const rec = bucket[s.id] || {};
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td class="name-cell">${s.name}</td>
-                    ${ALL_SUBJECTS.map(sub => `<td><input type="number" min="0" max="100" step="0.5" data-sub="${sub}" value="${getLeaf(rec, sub) ?? ''}"></td>`).join('')}
+                    <td class="name-cell">${escapeHtml(s.name)}</td>
+                    ${EXAM_SUBJECTS.map(sub => `<td><input type="number" min="0" max="100" step="0.5" data-sub="${sub}" value="${getLeaf(rec, sub) ?? ''}"></td>`).join('')}
                     <td class="derived" data-f="total">${fmt(allTotals[idx])}</td>
                     <td class="rank-cell" data-f="rank">${rankOf(allTotals[idx], allTotals)}</td>
                 `;
-                ALL_SUBJECTS.forEach(sub => {
+                EXAM_SUBJECTS.forEach(sub => {
                     const inp = tr.querySelector(`[data-sub="${sub}"]`);
                     const recalcRow = () => {
-                        const vals = ALL_SUBJECTS.map(k => num(tr.querySelector(`[data-sub="${k}"]`).value));
-                        const total = ALL_SUBJECTS.reduce((sum, k, i) => sum + vals[i] * EXAM_WEIGHT[k], 0);
+                        const vals = EXAM_SUBJECTS.map(k => num(tr.querySelector(`[data-sub="${k}"]`).value));
+                        const total = EXAM_SUBJECTS.reduce((sum, k, i) => sum + vals[i] * EXAM_WEIGHT[k], 0);
                         tr.querySelector('[data-f=total]').textContent = fmt(total);
                     };
                     inp.oninput = recalcRow;
                     inp.onchange = e => {
                         saveLeaf(['scores', bucketKey, s.id, sub], num(e.target.value));
-                        renderExamPanel(el); // 重新排名（會重繪表格，但此為 change 事件不影響輸入中焦點）
+                        renderExamPanel(el);
                     };
                 });
                 body.appendChild(tr);
             });
         }
 
-        /* ---------- 學期總成績（唯讀彙總） ---------- */
+        /* ---------- 學期總成績（唯讀彙總；不含自然/社會/英文） ---------- */
         function renderSummaryPanel(el){
             const data = state();
             const sc = data.scores;
             let html = '';
 
-            SUBJECTS.forEach(sub => {
+            // 主科：國語、數學（平時 + 段考）
+            CORE_SUBJECTS.forEach(sub => {
                 html += `<div class="section-title">${sub}</div>
                 <div class="table-wrap"><table class="grid">
                 <thead><tr><th style="text-align:left">姓名</th><th>平時(50)</th><th>段考(50)</th><th>總分</th><th>等第</th><th>努力程度</th></tr></thead>
                 <tbody>`;
+                const midBucket = ensureDailyBucket(sub, 'mid');
+                const finalBucket = ensureDailyBucket(sub, 'final');
                 data.students.forEach(s => {
-                    const midHW = getLeaf(sc.homework[sub].mid, s.id) || 0, midQZ = getLeaf(sc.quiz[sub].mid, s.id) || 0, midPF = getLeaf(sc.perform[sub].mid, s.id) || 0;
-                    const finHW = getLeaf(sc.homework[sub].final, s.id) || 0, finQZ = getLeaf(sc.quiz[sub].final, s.id) || 0, finPF = getLeaf(sc.perform[sub].final, s.id) || 0;
-                    const midScore = dailyScore100(midHW, midQZ, midPF);
-                    const finScore = dailyScore100(finHW, finQZ, finPF);
-                    const d50 = daily50(midScore, finScore);
+                    const mid100 = dailyScore100FromBucket(midBucket, s.id);
+                    const final100 = dailyScore100FromBucket(finalBucket, s.id);
+                    const d50 = (mid100 + final100) / 4;
                     const examMid = getLeaf(sc.examMid[s.id], sub) || 0;
                     const examFinal = getLeaf(sc.examFinal[s.id], sub) || 0;
-                    const e50 = examPart50(examMid, examFinal);
+                    const e50 = (examMid + examFinal) * 0.25;
                     const total = d50 + e50;
-                    html += `<tr><td class="name-cell">${s.name}</td><td>${fmt(d50)}</td><td>${fmt(e50)}</td><td class="derived">${fmt(total)}</td><td>${letterGrade(total)}</td><td>${effortLevel(d50)}</td></tr>`;
+                    html += `<tr><td class="name-cell">${escapeHtml(s.name)}</td><td>${fmt(d50)}</td><td>${fmt(e50)}</td><td class="derived">${fmt(total)}</td><td>${letterGrade(total)}</td><td>${effortLevel50(d50)}</td></tr>`;
                 });
                 html += `</tbody></table></div>`;
             });
 
-            EXAM_ONLY.forEach(sub => {
-                html += `<div class="section-title">${sub}（僅段考）</div>
+            // 自訂科目：只有平時，無段考
+            customSubjects().forEach(c => {
+                html += `<div class="section-title">${c.name}</div>
                 <div class="table-wrap"><table class="grid">
-                <thead><tr><th style="text-align:left">姓名</th><th>期中</th><th>期末</th><th>平均</th></tr></thead>
+                <thead><tr><th style="text-align:left">姓名</th><th>平時分數</th><th>等第</th><th>努力程度</th></tr></thead>
                 <tbody>`;
                 data.students.forEach(s => {
-                    const mid = getLeaf(sc.examMid[s.id], sub);
-                    const fin = getLeaf(sc.examFinal[s.id], sub);
-                    const avg = (mid !== null || fin !== null) ? ((mid || 0) + (fin || 0)) / ((mid !== null ? 1 : 0) + (fin !== null ? 1 : 0) || 1) : null;
-                    html += `<tr><td class="name-cell">${s.name}</td><td>${mid ?? '-'}</td><td>${fin ?? '-'}</td><td class="derived">${avg !== null ? fmt(avg) : '-'}</td></tr>`;
+                    let total;
+                    if(c.periodMode === 'split'){
+                        const midBucket = ensureDailyBucket(c.id, 'mid');
+                        const finalBucket = ensureDailyBucket(c.id, 'final');
+                        total = (dailyScore100FromBucket(midBucket, s.id) + dailyScore100FromBucket(finalBucket, s.id)) / 2;
+                    } else {
+                        const bucket = ensureDailyBucket(c.id, 'single');
+                        total = dailyScore100FromBucket(bucket, s.id);
+                    }
+                    html += `<tr><td class="name-cell">${escapeHtml(s.name)}</td><td class="derived">${fmt(total)}</td><td>${letterGrade(total)}</td><td>${effortLevel100(total)}</td></tr>`;
                 });
                 html += `</tbody></table></div>`;
             });
 
+            if(!CORE_SUBJECTS.length && !customSubjects().length) html = '<p class="empty-note">尚無科目資料</p>';
             el.innerHTML = html;
         }
+
+        /* ---------- 學生名單（第 4 頁）＋ 科目管理 ---------- */
+        function renderRosterPanel(el){
+            const data = state();
+            el.innerHTML = `
+                <div class="section-title" style="margin-top:0">學生名單</div>
+                <div class="table-wrap">
+                    <table class="grid">
+                        <thead><tr><th>座號</th><th style="text-align:left">姓名</th><th>操作</th></tr></thead>
+                        <tbody id="rosterBody"></tbody>
+                    </table>
+                </div>
+                <div class="add-student-bar"><button class="btn" id="addStudentBtn">＋ 新增學生</button></div>
+
+                <div class="section-title">科目管理</div>
+                <p class="hint-text">國語、數學、自然、社會、英文為固定科目。其餘授課科目（例如健康、綜合、彈性課程等）可在此新增，僅登記平時成績。</p>
+                <div id="subjectList"></div>
+                <div class="subject-add-form">
+                    <input type="text" id="newSubjectName" placeholder="新科目名稱">
+                    <select id="newSubjectMode">
+                        <option value="split">分期中／期末登記</option>
+                        <option value="single">一學期登記一次</option>
+                    </select>
+                    <button class="btn small" id="addSubjectBtn">＋ 新增科目</button>
+                </div>
+            `;
+            const body = el.querySelector('#rosterBody');
+            data.students.forEach((s, idx) => {
+                const tr = document.createElement('tr');
+                tr.className = 'roster-row';
+                tr.innerHTML = `<td>${idx + 1}</td><td><input type="text" value="${escapeHtml(s.name)}"></td><td><button class="btn danger small">刪除</button></td>`;
+                tr.querySelector('input').onchange = e => {
+                    s.name = e.target.value.trim() || s.name;
+                    saveLeaf(['students'], data.students);
+                    refreshAllPanels();
+                };
+                tr.querySelector('button').onclick = async () => {
+                    const ok = await askInput(`確定刪除「${s.name}」？輸入「刪除」以確認`, '');
+                    if(ok === '刪除'){
+                        data.students = data.students.filter(x => x.id !== s.id);
+                        saveLeaf(['students'], data.students);
+                        renderRosterPanel(el);
+                        refreshAllPanels();
+                    }
+                };
+                body.appendChild(tr);
+            });
+            el.querySelector('#addStudentBtn').onclick = async () => {
+                const name = await askInput('請輸入新學生姓名', '');
+                if(name && name.trim()){
+                    data.students.push({ id: newId('s'), name: name.trim() });
+                    saveLeaf(['students'], data.students);
+                    renderRosterPanel(el);
+                    refreshAllPanels();
+                }
+            };
+
+            const subjList = el.querySelector('#subjectList');
+            if(!data.subjects.custom.length){
+                subjList.innerHTML = '<p class="hint-text" style="margin:0 0 8px">尚未新增其他科目。</p>';
+            } else {
+                subjList.innerHTML = data.subjects.custom.map(c => `
+                    <div class="subject-manage-row">
+                        <strong>${escapeHtml(c.name)}</strong>
+                        <span class="hint-text" style="margin:0">（${c.periodMode === 'split' ? '分期中／期末' : '一學期一次'}）</span>
+                        <button class="btn danger small" data-del="${c.id}">刪除科目</button>
+                    </div>
+                `).join('');
+                subjList.querySelectorAll('[data-del]').forEach(btn => btn.onclick = async () => {
+                    const c = data.subjects.custom.find(x => x.id === btn.dataset.del);
+                    const ok = await askInput(`確定刪除科目「${c.name}」？此科目已登記的成績也會一併移除。輸入「刪除」以確認`, '');
+                    if(ok === '刪除'){
+                        data.subjects.custom = data.subjects.custom.filter(x => x.id !== c.id);
+                        delete data.scores.daily[c.id];
+                        saveData({ subjects: { custom: data.subjects.custom }, scores: { daily: { [c.id]: null } } });
+                        renderRosterPanel(el);
+                        refreshAllPanels();
+                    }
+                });
+            }
+            el.querySelector('#addSubjectBtn').onclick = () => {
+                const nameInp = el.querySelector('#newSubjectName');
+                const modeSel = el.querySelector('#newSubjectMode');
+                const name = nameInp.value.trim();
+                if(!name){ window.showAlert('請輸入科目名稱'); return; }
+                if(CORE_SUBJECTS.includes(name) || EXAM_ONLY.includes(name) || data.subjects.custom.some(c => c.name === name)){ window.showAlert('已有相同名稱的科目'); return; }
+                data.subjects.custom.push({ id: newId('subj'), name, periodMode: modeSel.value });
+                saveLeaf(['subjects', 'custom'], data.subjects.custom);
+                nameInp.value = '';
+                renderRosterPanel(el);
+                refreshAllPanels();
+            };
+        }
+
+        function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
         /* ========================================================= */
     </script>
 </body>
