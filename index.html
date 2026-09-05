@@ -116,11 +116,11 @@
         table.grid input[type=number]:focus { border-color: var(--accent); box-shadow: 0 0 8px 2px var(--focus-glow); outline: none; }
         table.grid input[type=text] { padding: 6px 10px; border: 2px solid var(--line); border-radius: 8px; font-family: inherit; font-size: 0.95em; background: var(--surface); color: var(--text); width: 120px; text-align: center; }
         table.grid input[type=text]:focus { border-color: var(--accent); box-shadow: 0 0 8px 2px var(--focus-glow); outline: none; }
-        table.grid th input[type=text] { width: 74px; text-align: center; }
-        .col-head { display: flex; align-items: center; justify-content: center; gap: 3px; }
+        table.grid th input[type=text] { display: block; margin: 0 auto; text-align: center; min-width: 64px; }
+        table.grid th.col-head-cell { position: relative; padding-right: 22px; }
         td.derived { font-weight: bold; color: var(--accent-dark); }
         td.rank-cell { font-weight: bold; }
-        .col-del-btn { border: none; background: transparent; color: var(--danger); cursor: pointer; font-size: 0.85em; margin-left: 4px; border-radius: 50%; width: 22px; height: 22px; transition: background 0.15s; }
+        .col-del-btn { border: none; background: transparent; color: var(--danger); cursor: pointer; font-size: 0.85em; border-radius: 50%; width: 20px; height: 20px; transition: background 0.15s; position: absolute; top: 3px; right: 3px; line-height: 1; padding: 0; }
         .col-del-btn:hover { background: color-mix(in srgb, var(--danger) 18%, transparent); }
 
         .section-title { font-size: 1.15em; margin: 26px 0 10px; padding-bottom: 6px; border-bottom: 2px solid var(--line); }
@@ -587,7 +587,7 @@
                 <p class="hint-text">每一欄可自訂名稱（例如「第1次習作」），成績以 0–100 分登記；學生的「平均」為該生已填欄位的平均分數。</p>
                 <div class="table-wrap">
                     <table class="grid">
-                        <thead><tr><th>姓名</th>${catBucket.columns.map(c => `<th><div class="col-head"><input type="text" data-col="${c.id}" value="${escapeHtml(c.name)}"><button class="col-del-btn" data-col="${c.id}" title="刪除此欄">✕</button></div></th>`).join('')}<th>平均</th></tr></thead>
+                        <thead><tr><th>姓名</th>${catBucket.columns.map(c => `<th class="col-head-cell"><input type="text" data-col="${c.id}" value="${escapeHtml(c.name)}" style="width:${Math.max(64, c.name.length * 15 + 16)}px"><button class="col-del-btn" data-col="${c.id}" title="刪除此欄">✕</button></th>`).join('')}<th>平均</th></tr></thead>
                         <tbody id="catBody"></tbody>
                     </table>
                 </div>
@@ -626,10 +626,15 @@
                     renderDailyCategorySub(area, data, bucket, cat);
                 }
             });
-            area.querySelectorAll('th input[type=text]').forEach(inp => inp.onchange = e => {
-                const colId = inp.dataset.col;
-                const col = catBucket.columns.find(c => c.id === colId);
-                if(col){ col.name = e.target.value.trim() || col.name; saveLeaf(['scores', 'daily', dailySubjectKey, dailyPeriod, cat, 'columns'], catBucket.columns); }
+            area.querySelectorAll('th input[type=text]').forEach(inp => {
+                const resize = () => { inp.style.width = Math.max(64, inp.value.length * 15 + 16) + 'px'; };
+                inp.oninput = resize;
+                inp.onchange = e => {
+                    const colId = inp.dataset.col;
+                    const col = catBucket.columns.find(c => c.id === colId);
+                    if(col){ col.name = e.target.value.trim() || col.name; saveLeaf(['scores', 'daily', dailySubjectKey, dailyPeriod, cat, 'columns'], catBucket.columns); }
+                    resize();
+                };
             });
         }
 
