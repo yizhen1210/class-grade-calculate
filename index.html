@@ -33,6 +33,7 @@
             margin: 0; min-height: 100vh;
             background: var(--bg); color: var(--text);
             -webkit-font-smoothing: antialiased;
+            zoom: 1.15; /* 畫面等比放大 */
         }
 
         /* ---- 載入 gate：首次資料到齊前隱藏會變動的內容，避免預設值閃現 ---- */
@@ -61,12 +62,16 @@
         }
 
         /* ---- 一般按鈕 ---- */
-        .btn { padding: 9px 22px; border-radius: 50px; border: 2px solid var(--accent); background: var(--accent); color: #fff; font-family: inherit; font-size: 1em; cursor: pointer; }
+        .btn { padding: 9px 22px; border-radius: 50px; border: 2px solid var(--accent); background: var(--accent); color: #fff; font-family: inherit; font-size: 1em; cursor: pointer; transition: background 0.15s, color 0.15s, border-color 0.15s; }
+        .btn:hover { background: var(--accent-dark); border-color: var(--accent-dark); }
         .btn.outline { background: transparent; color: var(--accent); }
+        .btn.outline:hover { background: var(--accent); color: #fff; }
         .btn.small { padding: 5px 14px; font-size: 0.85em; }
         .btn.danger { border-color: var(--danger); background: var(--danger); }
-        .icon-btn { border: none; background: transparent; color: var(--accent); cursor: pointer; font-size: 0.55em; vertical-align: middle; padding: 4px 8px; border-radius: 50%; }
-        .icon-btn:hover { background: color-mix(in srgb, var(--accent) 15%, transparent); }
+        .btn.danger:hover { background: color-mix(in srgb, var(--danger) 80%, #000); border-color: color-mix(in srgb, var(--danger) 80%, #000); }
+        .icon-btn { border: 1px solid var(--line); background: transparent; color: var(--accent); cursor: pointer; font-size: 0.9em; vertical-align: middle; padding: 0; border-radius: 50%; width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; transition: background 0.15s, color 0.15s; }
+        .icon-btn:hover { background: var(--accent); color: #fff; }
+        .hidden { display: none; }
 
         .admin-only.hidden { display: none; }
 
@@ -82,13 +87,16 @@
         .empty-note { text-align: center; color: var(--muted); padding: 60px 20px; font-size: 1.1em; }
 
         .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
-        .tab-btn { padding: 8px 20px; border-radius: 50px; border: 2px solid var(--line); background: var(--surface); color: var(--text); font-family: inherit; cursor: pointer; font-size: 0.95em; }
+        .tab-btn { padding: 8px 20px; border-radius: 50px; border: 2px solid var(--line); background: var(--surface); color: var(--text); font-family: inherit; cursor: pointer; font-size: 0.95em; transition: background 0.15s, border-color 0.15s, color 0.15s; }
+        .tab-btn:hover { border-color: var(--accent); color: var(--accent-dark); }
         .tab-btn.active { border-color: var(--accent); background: var(--accent); color: #fff; }
+        .tab-btn.active:hover { background: var(--accent-dark); color: #fff; }
         .tab-panel { display: none; }
         .tab-panel.active { display: block; }
 
         .subtabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
-        .subtab-btn { padding: 6px 16px; border-radius: 50px; border: 2px solid var(--line); background: var(--surface); color: var(--text); font-family: inherit; cursor: pointer; font-size: 0.88em; }
+        .subtab-btn { padding: 6px 16px; border-radius: 50px; border: 2px solid var(--line); background: var(--surface); color: var(--text); font-family: inherit; cursor: pointer; font-size: 0.88em; transition: background 0.15s, border-color 0.15s, color 0.15s; }
+        .subtab-btn:hover { border-color: var(--accent-dark); }
         .subtab-btn.active { border-color: var(--accent-dark); background: color-mix(in srgb, var(--accent) 18%, var(--surface)); color: var(--accent-dark); font-weight: bold; }
 
         .toolbar { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
@@ -99,7 +107,7 @@
         table.grid { border-collapse: collapse; width: 100%; min-width: 560px; }
         table.grid th, table.grid td { padding: 8px 10px; text-align: center; border-bottom: 1px solid var(--line); white-space: nowrap; }
         table.grid th { background: color-mix(in srgb, var(--accent) 12%, var(--surface)); font-weight: normal; color: var(--text); position: sticky; top: 0; }
-        table.grid td.name-cell { text-align: left; font-weight: bold; }
+        table.grid td.name-cell { text-align: center; font-weight: bold; }
         table.grid tr:last-child td { border-bottom: none; }
         table.grid input[type=number] { width: 70px; padding: 6px 4px; border: 2px solid var(--line); border-radius: 8px; text-align: center; font-family: inherit; font-size: 0.95em; background: var(--surface); color: var(--text); }
         table.grid input[type=number]:focus { border-color: var(--accent); box-shadow: 0 0 8px 2px var(--focus-glow); outline: none; }
@@ -108,7 +116,8 @@
         table.grid th input[type=text] { width: 100px; text-align: center; }
         td.derived { font-weight: bold; color: var(--accent-dark); }
         td.rank-cell { font-weight: bold; }
-        .col-del-btn { border: none; background: transparent; color: var(--danger); cursor: pointer; font-size: 0.85em; margin-left: 4px; }
+        .col-del-btn { border: none; background: transparent; color: var(--danger); cursor: pointer; font-size: 0.85em; margin-left: 4px; border-radius: 50%; width: 22px; height: 22px; transition: background 0.15s; }
+        .col-del-btn:hover { background: color-mix(in srgb, var(--danger) 18%, transparent); }
 
         .section-title { font-size: 1.15em; margin: 26px 0 10px; padding-bottom: 6px; border-bottom: 2px solid var(--line); }
         .section-title:first-child { margin-top: 0; }
@@ -137,11 +146,11 @@
         <div class="header-inner">
             <div class="header-side"></div>
             <div class="header-title" data-gated>
-                <h1><span id="appTitle">608</span>成績計算 <button id="editClassBtn" class="icon-btn admin-only hidden" title="修改班級名稱">✎ 改名</button></h1>
+                <h1><span id="appTitle">608</span>成績計算 <button id="editClassBtn" class="icon-btn admin-only hidden" title="修改班級名稱">✎</button></h1>
             </div>
             <div class="header-side header-actions">
                 <button id="loginBtn" class="btn outline">登入</button>
-                <button id="logoutBtn" class="btn outline admin-only hidden">登出</button>
+                <button id="logoutBtn" class="btn outline hidden">登出</button>
             </div>
         </div>
     </header>
@@ -259,6 +268,8 @@
         onAuthStateChanged(auth, user => {
             isAdmin = isAuthorized(user);
             document.querySelectorAll('.admin-only').forEach(el => el.classList.toggle('hidden', !isAdmin));
+            $('loginBtn').classList.toggle('hidden', !!user);
+            $('logoutBtn').classList.toggle('hidden', !user);
             maybeLoadEditor();
         });
 
@@ -504,7 +515,7 @@
                 <p class="hint-text">每一欄可自訂名稱（例如「第1次習作」），成績以 0–100 分登記；學生的「平均」為該生已填欄位的平均分數。</p>
                 <div class="table-wrap">
                     <table class="grid">
-                        <thead><tr><th style="text-align:left">姓名</th>${catBucket.columns.map(c => `<th><input type="text" data-col="${c.id}" value="${escapeHtml(c.name)}"><button class="col-del-btn" data-col="${c.id}" title="刪除此欄">✕</button></th>`).join('')}<th>平均</th></tr></thead>
+                        <thead><tr><th>姓名</th>${catBucket.columns.map(c => `<th><input type="text" data-col="${c.id}" value="${escapeHtml(c.name)}"><button class="col-del-btn" data-col="${c.id}" title="刪除此欄">✕</button></th>`).join('')}<th>平均</th></tr></thead>
                         <tbody id="catBody"></tbody>
                     </table>
                 </div>
@@ -558,7 +569,7 @@
                 <p class="hint-text">平時分數 ＝ 作業平均×0.4 ＋ 平考平均×0.4 ＋ 上課表現平均×0.2</p>
                 <div class="table-wrap">
                     <table class="grid">
-                        <thead><tr><th style="text-align:left">姓名</th><th>作業平均</th><th>平考平均</th><th>表現平均</th><th>平時分數</th></tr></thead>
+                        <thead><tr><th>姓名</th><th>作業平均</th><th>平考平均</th><th>表現平均</th><th>平時分數</th></tr></thead>
                         <tbody>${data.students.map(s => {
                             const hw = categoryAverage(bucket.homework, s.id);
                             const qz = categoryAverage(bucket.quiz, s.id);
@@ -582,7 +593,7 @@
                 </div>
                 <div class="table-wrap">
                     <table class="grid">
-                        <thead><tr><th style="text-align:left">姓名</th>${EXAM_SUBJECTS.map(s => `<th>${s}</th>`).join('')}<th>加權總分</th><th>排名</th></tr></thead>
+                        <thead><tr><th>姓名</th>${EXAM_SUBJECTS.map(s => `<th>${s}</th>`).join('')}<th>加權總分</th><th>排名</th></tr></thead>
                         <tbody id="examBody"></tbody>
                     </table>
                 </div>
@@ -624,56 +635,74 @@
             });
         }
 
-        /* ---------- 學期總成績（唯讀彙總；不含自然/社會/英文） ---------- */
+        /* ---------- 學期總成績（唯讀彙總；不含自然/社會/英文；用按鈕切換科目） ---------- */
+        let summarySubjectKey = null;
+        function summarySubjectList(){
+            return [
+                ...CORE_SUBJECTS.map(name => ({ key: name, name, isCore: true })),
+                ...customSubjects().map(c => ({ key: c.id, name: c.name, isCore: false, periodMode: c.periodMode }))
+            ];
+        }
         function renderSummaryPanel(el){
             const data = state();
+            const list = summarySubjectList();
+            if(!list.length){ el.innerHTML = '<p class="empty-note">尚無科目資料</p>'; return; }
+            if(!summarySubjectKey || !list.some(s => s.key === summarySubjectKey)) summarySubjectKey = list[0].key;
+
+            el.innerHTML = `
+                <div class="subtabs">${list.map(s => `<button class="subtab-btn" data-sub="${s.key}">${escapeHtml(s.name)}</button>`).join('')}</div>
+                <div id="summaryTableArea"></div>
+            `;
+            el.querySelectorAll('.subtab-btn').forEach(b => b.onclick = () => { summarySubjectKey = b.dataset.sub; renderSummaryTable(el); });
+            renderSummaryTable(el);
+        }
+
+        function renderSummaryTable(el){
+            el.querySelectorAll('.subtab-btn').forEach(b => b.classList.toggle('active', b.dataset.sub === summarySubjectKey));
+            const area = el.querySelector('#summaryTableArea');
+            const data = state();
             const sc = data.scores;
+            const sub = summarySubjectList().find(s => s.key === summarySubjectKey);
             let html = '';
 
-            // 主科：國語、數學（平時 + 段考）
-            CORE_SUBJECTS.forEach(sub => {
-                html += `<div class="section-title">${sub}</div>
+            if(sub.isCore){
+                // 主科：分開列出期中/期末的平時與段考，再算學期總分（各占 25%）
+                html += `<p class="hint-text">總分 ＝ 期中平時×0.25 ＋ 期末平時×0.25 ＋ 期中段考×0.25 ＋ 期末段考×0.25</p>
                 <div class="table-wrap"><table class="grid">
-                <thead><tr><th style="text-align:left">姓名</th><th>平時(50)</th><th>段考(50)</th><th>總分</th><th>等第</th><th>努力程度</th></tr></thead>
+                <thead><tr><th>姓名</th><th>期中平時</th><th>期末平時</th><th>期中段考</th><th>期末段考</th><th>總分</th><th>等第</th><th>努力程度</th></tr></thead>
                 <tbody>`;
-                const midBucket = ensureDailyBucket(sub, 'mid');
-                const finalBucket = ensureDailyBucket(sub, 'final');
+                const midBucket = ensureDailyBucket(sub.key, 'mid');
+                const finalBucket = ensureDailyBucket(sub.key, 'final');
                 data.students.forEach(s => {
-                    const mid100 = dailyScore100FromBucket(midBucket, s.id);
-                    const final100 = dailyScore100FromBucket(finalBucket, s.id);
-                    const d50 = (mid100 + final100) / 4;
-                    const examMid = getLeaf(sc.examMid[s.id], sub) || 0;
-                    const examFinal = getLeaf(sc.examFinal[s.id], sub) || 0;
-                    const e50 = (examMid + examFinal) * 0.25;
-                    const total = d50 + e50;
-                    html += `<tr><td class="name-cell">${escapeHtml(s.name)}</td><td>${fmt(d50)}</td><td>${fmt(e50)}</td><td class="derived">${fmt(total)}</td><td>${letterGrade(total)}</td><td>${effortLevel50(d50)}</td></tr>`;
+                    const midDaily = dailyScore100FromBucket(midBucket, s.id);
+                    const finalDaily = dailyScore100FromBucket(finalBucket, s.id);
+                    const examMid = getLeaf(sc.examMid[s.id], sub.key) || 0;
+                    const examFinal = getLeaf(sc.examFinal[s.id], sub.key) || 0;
+                    const total = (midDaily + finalDaily + examMid + examFinal) * 0.25;
+                    const d50 = (midDaily + finalDaily) / 4; // 用於努力程度門檻（0-50 制）
+                    html += `<tr><td class="name-cell">${escapeHtml(s.name)}</td><td>${fmt(midDaily)}</td><td>${fmt(finalDaily)}</td><td>${fmt(examMid)}</td><td>${fmt(examFinal)}</td><td class="derived">${fmt(total)}</td><td>${letterGrade(total)}</td><td>${effortLevel50(d50)}</td></tr>`;
                 });
                 html += `</tbody></table></div>`;
-            });
-
-            // 自訂科目：只有平時，無段考
-            customSubjects().forEach(c => {
-                html += `<div class="section-title">${c.name}</div>
-                <div class="table-wrap"><table class="grid">
-                <thead><tr><th style="text-align:left">姓名</th><th>平時分數</th><th>等第</th><th>努力程度</th></tr></thead>
+            } else {
+                // 自訂科目：只有平時，無段考
+                html += `<div class="table-wrap"><table class="grid">
+                <thead><tr><th>姓名</th><th>平時分數</th><th>等第</th><th>努力程度</th></tr></thead>
                 <tbody>`;
                 data.students.forEach(s => {
                     let total;
-                    if(c.periodMode === 'split'){
-                        const midBucket = ensureDailyBucket(c.id, 'mid');
-                        const finalBucket = ensureDailyBucket(c.id, 'final');
+                    if(sub.periodMode === 'split'){
+                        const midBucket = ensureDailyBucket(sub.key, 'mid');
+                        const finalBucket = ensureDailyBucket(sub.key, 'final');
                         total = (dailyScore100FromBucket(midBucket, s.id) + dailyScore100FromBucket(finalBucket, s.id)) / 2;
                     } else {
-                        const bucket = ensureDailyBucket(c.id, 'single');
+                        const bucket = ensureDailyBucket(sub.key, 'single');
                         total = dailyScore100FromBucket(bucket, s.id);
                     }
                     html += `<tr><td class="name-cell">${escapeHtml(s.name)}</td><td class="derived">${fmt(total)}</td><td>${letterGrade(total)}</td><td>${effortLevel100(total)}</td></tr>`;
                 });
                 html += `</tbody></table></div>`;
-            });
-
-            if(!CORE_SUBJECTS.length && !customSubjects().length) html = '<p class="empty-note">尚無科目資料</p>';
-            el.innerHTML = html;
+            }
+            area.innerHTML = html;
         }
 
         /* ---------- 學生名單（第 4 頁）＋ 科目管理 ---------- */
@@ -683,7 +712,7 @@
                 <div class="section-title" style="margin-top:0">學生名單</div>
                 <div class="table-wrap">
                     <table class="grid">
-                        <thead><tr><th>座號</th><th style="text-align:left">姓名</th><th>操作</th></tr></thead>
+                        <thead><tr><th>座號</th><th>姓名</th><th>操作</th></tr></thead>
                         <tbody id="rosterBody"></tbody>
                     </table>
                 </div>
