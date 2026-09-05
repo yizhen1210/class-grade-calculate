@@ -97,6 +97,7 @@
         .subtabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
         .subtabs-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
         .subtabs-row .subtabs { margin-bottom: 0; }
+        .subtabs-actions { display: flex; gap: 8px; flex-wrap: wrap; }
         .subtab-btn { padding: 6px 16px; border-radius: 50px; border: 2px solid var(--line); background: var(--surface); color: var(--text); font-family: inherit; cursor: pointer; font-size: 0.88em; transition: background 0.15s, border-color 0.15s, color 0.15s; }
         .subtab-btn:hover { border-color: var(--accent-dark); }
         .subtab-btn.active { border-color: var(--accent-dark); background: color-mix(in srgb, var(--accent) 18%, var(--surface)); color: var(--accent-dark); font-weight: bold; }
@@ -111,11 +112,12 @@
         table.grid th { background: color-mix(in srgb, var(--accent) 12%, var(--surface)); font-weight: normal; color: var(--text); position: sticky; top: 0; }
         table.grid td.name-cell { text-align: center; font-weight: bold; }
         table.grid tr:last-child td { border-bottom: none; }
-        table.grid input[type=number] { width: 70px; padding: 6px 4px; border: 2px solid var(--line); border-radius: 8px; text-align: center; font-family: inherit; font-size: 0.95em; background: var(--surface); color: var(--text); }
+        table.grid input[type=number] { width: 74px; padding: 6px 4px; border: 2px solid var(--line); border-radius: 8px; text-align: center; font-family: inherit; font-size: 0.95em; background: var(--surface); color: var(--text); }
         table.grid input[type=number]:focus { border-color: var(--accent); box-shadow: 0 0 8px 2px var(--focus-glow); outline: none; }
-        table.grid input[type=text] { padding: 6px 10px; border: 2px solid var(--line); border-radius: 8px; font-family: inherit; font-size: 0.95em; background: var(--surface); color: var(--text); width: 120px; }
+        table.grid input[type=text] { padding: 6px 10px; border: 2px solid var(--line); border-radius: 8px; font-family: inherit; font-size: 0.95em; background: var(--surface); color: var(--text); width: 120px; text-align: center; }
         table.grid input[type=text]:focus { border-color: var(--accent); box-shadow: 0 0 8px 2px var(--focus-glow); outline: none; }
-        table.grid th input[type=text] { width: 100px; text-align: center; }
+        table.grid th input[type=text] { width: 74px; text-align: center; }
+        .col-head { display: flex; align-items: center; justify-content: center; gap: 3px; }
         td.derived { font-weight: bold; color: var(--accent-dark); }
         td.rank-cell { font-weight: bold; }
         .col-del-btn { border: none; background: transparent; color: var(--danger); cursor: pointer; font-size: 0.85em; margin-left: 4px; border-radius: 50%; width: 22px; height: 22px; transition: background 0.15s; }
@@ -253,6 +255,8 @@
 
         /* ---------- 通用資料層 ---------- */
         function saveData(obj){ if(!isAdmin) return; setDoc(ref, obj, { merge: SAVE_MERGE }).catch(e=>console.warn(e)); }
+        // 完整覆寫整份文件（不 merge）：僅用於「封存後清空成績」，因為 merge 無法真正清掉巢狀舊資料
+        function saveDataFull(obj){ if(!isAdmin) return; setDoc(ref, obj, { merge: false }).catch(e=>console.warn(e)); }
         onSnapshot(ref, snap => {
             lastData = snap.exists() ? snap.data() : null;
             dataArrived = true;
@@ -280,12 +284,23 @@
 
         window.askInput = (msg, def) => new Promise(res => {
             const m = $('promptModal'), inp = $('promptInput'), ok = $('promptOk'), no = $('promptNo');
+            inp.style.display = '';
             $('promptMsg').textContent = msg; inp.value = def || '';
             m.style.display = 'flex'; setTimeout(() => { inp.focus(); inp.select(); }, 50);
             const done = v => { m.style.display = 'none'; ok.onclick = null; no.onclick = null; inp.onkeydown = null; res(v); };
             ok.onclick = () => done(inp.value);
             no.onclick = () => done(null);
             inp.onkeydown = e => { if(e.key === 'Enter') done(inp.value); else if(e.key === 'Escape') done(null); };
+        });
+
+        // 純確認框（無輸入欄），回傳 true/false
+        window.askConfirm = (msg) => new Promise(res => {
+            const m = $('promptModal'), inp = $('promptInput'), ok = $('promptOk'), no = $('promptNo');
+            $('promptMsg').textContent = msg; inp.style.display = 'none';
+            m.style.display = 'flex';
+            const done = v => { m.style.display = 'none'; inp.style.display = ''; ok.onclick = null; no.onclick = null; res(v); };
+            ok.onclick = () => done(true);
+            no.onclick = () => done(false);
         });
 
         /* ---------- 登入 / 登出 ---------- */
@@ -379,6 +394,7 @@
             if(!lastData.className) lastData.className = DEFAULT_CLASS_NAME;
             if(!lastData.subjects) lastData.subjects = {};
             if(!Array.isArray(lastData.subjects.custom)) lastData.subjects.custom = [];
+            if(!Array.isArray(lastData.archives)) lastData.archives = [];
             if(!lastData.scores) lastData.scores = {};
             if(!lastData.scores.daily) lastData.scores.daily = {};
             if(!lastData.scores.examMid) lastData.scores.examMid = {};
@@ -501,7 +517,10 @@
                         ${catList.map((cat, i) => `<button class="subtab-btn" data-cat="${cat}">${i + 1} ${CATEGORY_LABEL[cat]}</button>`).join('')}
                         <button class="subtab-btn" data-cat="__summary">${catList.length + 1} 平時分數</button>
                     </div>
-                    <button class="btn small" id="addItemBtn"></button>
+                    <div class="subtabs-actions">
+                        <button class="btn small" id="addItemBtn"></button>
+                        <button class="btn small danger" id="clearScoresBtn"></button>
+                    </div>
                 </div>
                 <div id="dailyCategoryArea"></div>
             `;
@@ -519,15 +538,28 @@
             const data = state();
             const bucket = ensureDailyBucket(dailySubjectKey, dailyPeriod);
             const addBtn = el.querySelector('#addItemBtn');
+            const clearBtn = el.querySelector('#clearScoresBtn');
 
             if(dailyCategoryTab === '__summary'){
                 addBtn.classList.add('hidden');
+                clearBtn.classList.add('hidden');
                 renderDailySummarySub(area, data, bucket, sub);
                 return;
             }
             addBtn.classList.remove('hidden');
             addBtn.textContent = `＋ 新增${CATEGORY_LABEL[dailyCategoryTab]}項目`;
             addBtn.onclick = () => addDailyColumn(area, bucket, dailyCategoryTab, sub);
+            clearBtn.classList.remove('hidden');
+            clearBtn.textContent = `清空${CATEGORY_LABEL[dailyCategoryTab]}分數`;
+            clearBtn.onclick = async () => {
+                const catBucket = bucket[dailyCategoryTab];
+                const ok = await askConfirm(`確定清空「${CATEGORY_LABEL[dailyCategoryTab]}」目前所有學生的分數？項目欄位會保留，此動作無法復原。`);
+                if(ok){
+                    catBucket.values = {};
+                    saveLeaf(['scores', 'daily', dailySubjectKey, dailyPeriod, dailyCategoryTab, 'values'], {});
+                    renderDailyCategorySub(area, data, bucket, dailyCategoryTab);
+                }
+            };
             renderDailyCategorySub(area, data, bucket, dailyCategoryTab);
         }
 
@@ -547,7 +579,7 @@
                 <p class="hint-text">每一欄可自訂名稱（例如「第1次習作」），成績以 0–100 分登記；學生的「平均」為該生已填欄位的平均分數。</p>
                 <div class="table-wrap">
                     <table class="grid">
-                        <thead><tr><th>姓名</th>${catBucket.columns.map(c => `<th><input type="text" data-col="${c.id}" value="${escapeHtml(c.name)}"><button class="col-del-btn" data-col="${c.id}" title="刪除此欄">✕</button></th>`).join('')}<th>平均</th></tr></thead>
+                        <thead><tr><th>姓名</th>${catBucket.columns.map(c => `<th><div class="col-head"><input type="text" data-col="${c.id}" value="${escapeHtml(c.name)}"><button class="col-del-btn" data-col="${c.id}" title="刪除此欄">✕</button></div></th>`).join('')}<th>平均</th></tr></thead>
                         <tbody id="catBody"></tbody>
                     </table>
                 </div>
@@ -573,8 +605,8 @@
                 body.appendChild(tr);
             });
             area.querySelectorAll('.col-del-btn').forEach(btn => btn.onclick = async () => {
-                const ok = await askInput('確定刪除這一欄？輸入「刪除」以確認', '');
-                if(ok === '刪除'){
+                const ok = await askConfirm('確定刪除這一欄？');
+                if(ok){
                     catBucket.columns = catBucket.columns.filter(c => c.id !== btn.dataset.col);
                     saveLeaf(['scores', 'daily', dailySubjectKey, dailyPeriod, cat, 'columns'], catBucket.columns);
                     renderDailyCategorySub(area, data, bucket, cat);
@@ -783,6 +815,11 @@
                     </select>
                     <button class="btn small" id="addSubjectBtn">＋ 新增科目</button>
                 </div>
+
+                <div class="section-title">學期封存</div>
+                <p class="hint-text">封存會把目前的學生名單、科目設定與所有成績存成一份快照（不會影響目前資料）。封存後可選擇是否清空目前成績以開始新學期，學生名單與科目設定則會保留。</p>
+                <button class="btn" id="archiveBtn">📦 封存學期紀錄</button>
+                <div id="archiveListArea" style="margin-top:14px"></div>
             `;
             const body = el.querySelector('#rosterBody');
             data.students.forEach((s, idx) => {
@@ -795,8 +832,8 @@
                     refreshAllPanels();
                 };
                 tr.querySelector('button').onclick = async () => {
-                    const ok = await askInput(`確定刪除「${s.name}」？輸入「刪除」以確認`, '');
-                    if(ok === '刪除'){
+                    const ok = await askConfirm(`確定刪除「${s.name}」？`);
+                    if(ok){
                         data.students = data.students.filter(x => x.id !== s.id);
                         saveLeaf(['students'], data.students);
                         renderRosterPanel(el);
@@ -828,8 +865,8 @@
                 `).join('');
                 subjList.querySelectorAll('[data-del]').forEach(btn => btn.onclick = async () => {
                     const c = data.subjects.custom.find(x => x.id === btn.dataset.del);
-                    const ok = await askInput(`確定刪除科目「${c.name}」？此科目已登記的成績也會一併移除。輸入「刪除」以確認`, '');
-                    if(ok === '刪除'){
+                    const ok = await askConfirm(`確定刪除科目「${c.name}」？此科目已登記的成績也會一併移除。`);
+                    if(ok){
                         data.subjects.custom = data.subjects.custom.filter(x => x.id !== c.id);
                         delete data.scores.daily[c.id];
                         saveData({ subjects: { custom: data.subjects.custom }, scores: { daily: { [c.id]: null } } });
@@ -847,6 +884,40 @@
                 data.subjects.custom.push({ id: newId('subj'), name, periodMode: modeSel.value });
                 saveLeaf(['subjects', 'custom'], data.subjects.custom);
                 nameInp.value = '';
+                renderRosterPanel(el);
+                refreshAllPanels();
+            };
+
+            const archiveArea = el.querySelector('#archiveListArea');
+            const archives = Array.isArray(data.archives) ? data.archives : [];
+            if(!archives.length){
+                archiveArea.innerHTML = '<p class="hint-text" style="margin:0">尚無封存紀錄。</p>';
+            } else {
+                archiveArea.innerHTML = `<div class="table-wrap"><table class="grid">
+                    <thead><tr><th>名稱</th><th>封存時間</th></tr></thead>
+                    <tbody>${archives.slice().reverse().map(a => `<tr><td>${escapeHtml(a.name)}</td><td>${new Date(a.archivedAt).toLocaleString('zh-TW')}</td></tr>`).join('')}</tbody>
+                </table></div>
+                <p class="hint-text">目前版本僅保留封存快照，尚未提供還原/查閱介面；如需要可以再請我加上。</p>`;
+            }
+            el.querySelector('#archiveBtn').onclick = async () => {
+                const name = await askInput('請輸入本次封存的學期紀錄名稱', '');
+                if(!name || !name.trim()) return;
+                const entry = {
+                    id: newId('arc'),
+                    name: name.trim(),
+                    archivedAt: new Date().toISOString(),
+                    snapshot: JSON.parse(JSON.stringify({ students: data.students, subjects: data.subjects, scores: data.scores }))
+                };
+                data.archives = archives.concat([entry]);
+                saveLeaf(['archives'], data.archives);
+
+                const doClear = await askConfirm(`已封存「${entry.name}」。是否清空目前所有成績以開始新學期？（學生名單與科目設定會保留，此動作無法復原）`);
+                if(doClear){
+                    data.scores = { daily: {}, examMid: {}, examFinal: {} };
+                    saveDataFull({ className: data.className, students: data.students, subjects: data.subjects, archives: data.archives, scores: data.scores });
+                } else {
+                    window.showAlert('已封存，目前成績維持不變');
+                }
                 renderRosterPanel(el);
                 refreshAllPanels();
             };
