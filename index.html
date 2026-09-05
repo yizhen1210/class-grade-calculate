@@ -81,7 +81,7 @@
         .header-side { display: flex; align-items: center; }
         .header-actions { justify-self: end; }
         .header-title { justify-self: center; text-align: center; }
-        .header-title h1 { font-size: 1.5em; margin: 0; white-space: nowrap; }
+        .header-title h1 { font-size: 2.1em; margin: 0; white-space: nowrap; }
         main, #adminArea { max-width: 1100px; margin: 0 auto; padding: 20px 16px 60px; }
 
         .empty-note { text-align: center; color: var(--muted); padding: 60px 20px; font-size: 1.1em; }
@@ -95,6 +95,8 @@
         .tab-panel.active { display: block; }
 
         .subtabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+        .subtabs-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+        .subtabs-row .subtabs { margin-bottom: 0; }
         .subtab-btn { padding: 6px 16px; border-radius: 50px; border: 2px solid var(--line); background: var(--surface); color: var(--text); font-family: inherit; cursor: pointer; font-size: 0.88em; transition: background 0.15s, border-color 0.15s, color 0.15s; }
         .subtab-btn:hover { border-color: var(--accent-dark); }
         .subtab-btn.active { border-color: var(--accent-dark); background: color-mix(in srgb, var(--accent) 18%, var(--surface)); color: var(--accent-dark); font-weight: bold; }
@@ -341,16 +343,23 @@
         function newId(prefix){ return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
         /* ---------- 科目清單（固定主科／段考科 + 自訂科目） ---------- */
-        // 自訂科目結構：{ id, name, periodMode: 'split' | 'single' }
+        // 自訂科目結構：{ id, name, periodMode: 'split' | 'single', weights: {homework, perform} }（百分比，兩者相加建議 100）
+        const DEFAULT_CUSTOM_WEIGHTS = { homework: 50, perform: 50 };
         function customSubjects(){ return state().subjects.custom; }
-        // 平時成績頁可選的科目清單（含主科＋自訂科目），統一格式 {key,name,periodMode,hasExam}
+        // 平時成績頁可選的科目清單（含主科＋自訂科目），統一格式 {key,name,periodMode,hasExam,weights}
         function dailySubjectList(){
             return [
                 ...CORE_SUBJECTS.map(name => ({ key: name, name, periodMode: 'split', hasExam: true })),
-                ...customSubjects().map(c => ({ key: c.id, name: c.name, periodMode: c.periodMode, hasExam: false }))
+                ...customSubjects().map(c => ({ key: c.id, name: c.name, periodMode: c.periodMode, hasExam: false, weights: c.weights || DEFAULT_CUSTOM_WEIGHTS }))
             ];
         }
         function findDailySubject(key){ return dailySubjectList().find(s => s.key === key); }
+        // 回傳計算平時分數用的加權比例（皆為 0-1 小數）；有段考的主科固定 0.4/0.4/0.2，無段考科目依設定的佔比（僅作業＋表現）
+        function weightsForSubject(sub){
+            if(sub.hasExam) return { homework: 0.4, quiz: 0.4, perform: 0.2 };
+            const w = sub.weights || DEFAULT_CUSTOM_WEIGHTS;
+            return { homework: (Number(w.homework) || 0) / 100, quiz: 0, perform: (Number(w.perform) || 0) / 100 };
+        }
 
         /* ---------- 資料骨架初始化 ---------- */
         function emptyCategoryBucket(){ return { columns: [], values: {} }; }
@@ -395,12 +404,13 @@
             if(!vals.length) return null;
             return vals.reduce((a, b) => a + b, 0) / vals.length;
         }
-        // 平時分數(0-100) = 作業平均*0.4 + 平考平均*0.4 + 表現平均*0.2（未填的類別以 0 計入加權）
-        function dailyScore100FromBucket(bucket, sid){
+        // 平時分數(0-100) = 作業平均*w1 + 平考平均*w2 + 表現平均*w3（未填的類別以 0 計入加權；weights 未傳入時預設為主科的 0.4/0.4/0.2）
+        function dailyScore100FromBucket(bucket, sid, weights){
+            const w = weights || { homework: 0.4, quiz: 0.4, perform: 0.2 };
             const hw = categoryAverage(bucket.homework, sid);
             const qz = categoryAverage(bucket.quiz, sid);
             const pf = categoryAverage(bucket.perform, sid);
-            return (hw || 0) * 0.4 + (qz || 0) * 0.4 + (pf || 0) * 0.2;
+            return (hw || 0) * w.homework + (qz || 0) * w.quiz + (pf || 0) * w.perform;
         }
 
         /* ---------- 未登入畫面 ---------- */
@@ -465,7 +475,7 @@
             renderSummaryPanel(root.querySelector('[data-panel="summary"]'));
         }
 
-        /* ---------- 平時成績（作業/平考/表現/彙總 四個子頁） ---------- */
+        /* ---------- 平時成績（作業/平考/表現/彙總；沒有段考的科目不顯示平考） ---------- */
         function renderDailyPanel(el){
             const data = state();
             const subjects = dailySubjectList();
@@ -473,6 +483,9 @@
             const sub = findDailySubject(dailySubjectKey);
             if(sub.periodMode === 'single') dailyPeriod = 'single';
             else if(dailyPeriod === 'single') dailyPeriod = 'mid';
+
+            const catList = sub.hasExam ? ['homework', 'quiz', 'perform'] : ['homework', 'perform'];
+            if(!catList.includes(dailyCategoryTab) && dailyCategoryTab !== '__summary') dailyCategoryTab = 'homework';
 
             el.innerHTML = `
                 <div class="toolbar">
@@ -483,11 +496,12 @@
                     <select id="dailyPeriodSel">${Object.entries(PERIODS).map(([k, v]) => `<option value="${k}" ${k === dailyPeriod ? 'selected' : ''}>${v}</option>`).join('')}</select>
                     ` : `<span class="hint-text" style="margin:0">此科目為一學期登記一次</span>`}
                 </div>
-                <div class="subtabs">
-                    <button class="subtab-btn" data-cat="homework">1 作業</button>
-                    <button class="subtab-btn" data-cat="quiz">2 平考</button>
-                    <button class="subtab-btn" data-cat="perform">3 上課表現</button>
-                    <button class="subtab-btn" data-cat="__summary">4 平時分數</button>
+                <div class="subtabs-row">
+                    <div class="subtabs">
+                        ${catList.map((cat, i) => `<button class="subtab-btn" data-cat="${cat}">${i + 1} ${CATEGORY_LABEL[cat]}</button>`).join('')}
+                        <button class="subtab-btn" data-cat="__summary">${catList.length + 1} 平時分數</button>
+                    </div>
+                    <button class="btn small" id="addItemBtn"></button>
                 </div>
                 <div id="dailyCategoryArea"></div>
             `;
@@ -495,18 +509,36 @@
             const periodSel = el.querySelector('#dailyPeriodSel');
             if(periodSel) periodSel.onchange = e => { dailyPeriod = e.target.value; renderDailyPanel(el); };
 
-            el.querySelectorAll('.subtab-btn').forEach(b => b.onclick = () => { dailyCategoryTab = b.dataset.cat; renderDailyCategoryArea(el); });
-            renderDailyCategoryArea(el);
+            el.querySelectorAll('.subtab-btn').forEach(b => b.onclick = () => { dailyCategoryTab = b.dataset.cat; renderDailyCategoryArea(el, sub); });
+            renderDailyCategoryArea(el, sub);
         }
 
-        function renderDailyCategoryArea(el){
+        function renderDailyCategoryArea(el, sub){
             el.querySelectorAll('.subtab-btn').forEach(b => b.classList.toggle('active', b.dataset.cat === dailyCategoryTab));
             const area = el.querySelector('#dailyCategoryArea');
             const data = state();
             const bucket = ensureDailyBucket(dailySubjectKey, dailyPeriod);
+            const addBtn = el.querySelector('#addItemBtn');
 
-            if(dailyCategoryTab === '__summary'){ renderDailySummarySub(area, data, bucket); return; }
+            if(dailyCategoryTab === '__summary'){
+                addBtn.classList.add('hidden');
+                renderDailySummarySub(area, data, bucket, sub);
+                return;
+            }
+            addBtn.classList.remove('hidden');
+            addBtn.textContent = `＋ 新增${CATEGORY_LABEL[dailyCategoryTab]}項目`;
+            addBtn.onclick = () => addDailyColumn(area, bucket, dailyCategoryTab, sub);
             renderDailyCategorySub(area, data, bucket, dailyCategoryTab);
+        }
+
+        async function addDailyColumn(area, bucket, cat, sub){
+            const catBucket = bucket[cat];
+            const name = await askInput(`請輸入${CATEGORY_LABEL[cat]}項目名稱`, `${CATEGORY_LABEL[cat]}${catBucket.columns.length + 1}`);
+            if(name && name.trim()){
+                catBucket.columns.push({ id: newId('c'), name: name.trim() });
+                saveLeaf(['scores', 'daily', dailySubjectKey, dailyPeriod, cat, 'columns'], catBucket.columns);
+                renderDailyCategorySub(area, state(), bucket, cat);
+            }
         }
 
         function renderDailyCategorySub(area, data, bucket, cat){
@@ -519,7 +551,6 @@
                         <tbody id="catBody"></tbody>
                     </table>
                 </div>
-                <div class="add-col-bar"><button class="btn small" id="addColBtn">＋ 新增${CATEGORY_LABEL[cat]}項目</button></div>
             `;
             const body = area.querySelector('#catBody');
             data.students.forEach(s => {
@@ -554,33 +585,54 @@
                 const col = catBucket.columns.find(c => c.id === colId);
                 if(col){ col.name = e.target.value.trim() || col.name; saveLeaf(['scores', 'daily', dailySubjectKey, dailyPeriod, cat, 'columns'], catBucket.columns); }
             });
-            area.querySelector('#addColBtn').onclick = async () => {
-                const name = await askInput(`請輸入${CATEGORY_LABEL[cat]}項目名稱`, `${CATEGORY_LABEL[cat]}${catBucket.columns.length + 1}`);
-                if(name && name.trim()){
-                    catBucket.columns.push({ id: newId('c'), name: name.trim() });
-                    saveLeaf(['scores', 'daily', dailySubjectKey, dailyPeriod, cat, 'columns'], catBucket.columns);
-                    renderDailyCategorySub(area, data, bucket, cat);
-                }
-            };
         }
 
-        function renderDailySummarySub(area, data, bucket){
+        function renderDailySummarySub(area, data, bucket, sub){
+            const weights = weightsForSubject(sub);
+            const weightEditor = sub.hasExam ? '' : `
+                <div class="toolbar" style="margin-bottom:10px">
+                    <label>作業佔比</label>
+                    <input type="number" id="wHomework" min="0" max="100" step="1" value="${weights.homework * 100}" style="width:70px;padding:6px 8px;border:2px solid var(--line);border-radius:8px;text-align:center;font-family:inherit">%
+                    <label>上課表現佔比</label>
+                    <input type="number" id="wPerform" min="0" max="100" step="1" value="${weights.perform * 100}" style="width:70px;padding:6px 8px;border:2px solid var(--line);border-radius:8px;text-align:center;font-family:inherit">%
+                </div>
+            `;
+            const formulaText = sub.hasExam
+                ? '平時分數 ＝ 作業平均×0.4 ＋ 平考平均×0.4 ＋ 上課表現平均×0.2'
+                : `平時分數 ＝ 作業平均×${fmt(weights.homework)} ＋ 上課表現平均×${fmt(weights.perform)}`;
             area.innerHTML = `
-                <p class="hint-text">平時分數 ＝ 作業平均×0.4 ＋ 平考平均×0.4 ＋ 上課表現平均×0.2</p>
+                ${weightEditor}
+                <p class="hint-text">${formulaText}</p>
                 <div class="table-wrap">
                     <table class="grid">
-                        <thead><tr><th>姓名</th><th>作業平均</th><th>平考平均</th><th>表現平均</th><th>平時分數</th></tr></thead>
+                        <thead><tr><th>姓名</th><th>作業平均</th>${sub.hasExam ? '<th>平考平均</th>' : ''}<th>表現平均</th><th>平時分數</th></tr></thead>
                         <tbody>${data.students.map(s => {
                             const hw = categoryAverage(bucket.homework, s.id);
                             const qz = categoryAverage(bucket.quiz, s.id);
                             const pf = categoryAverage(bucket.perform, s.id);
-                            const total = dailyScore100FromBucket(bucket, s.id);
-                            return `<tr><td class="name-cell">${escapeHtml(s.name)}</td><td>${hw !== null ? fmt(hw) : '-'}</td><td>${qz !== null ? fmt(qz) : '-'}</td><td>${pf !== null ? fmt(pf) : '-'}</td><td class="derived">${fmt(total)}</td></tr>`;
+                            const total = dailyScore100FromBucket(bucket, s.id, weights);
+                            return `<tr><td class="name-cell">${escapeHtml(s.name)}</td><td>${hw !== null ? fmt(hw) : '-'}</td>${sub.hasExam ? `<td>${qz !== null ? fmt(qz) : '-'}</td>` : ''}<td>${pf !== null ? fmt(pf) : '-'}</td><td class="derived">${fmt(total)}</td></tr>`;
                         }).join('')}</tbody>
                     </table>
                 </div>
             `;
+            if(!sub.hasExam){
+                const saveWeights = () => {
+                    const hwPct = num(area.querySelector('#wHomework').value);
+                    const pfPct = num(area.querySelector('#wPerform').value);
+                    const custom = customSubjects();
+                    const rec = custom.find(c => c.id === sub.key);
+                    if(rec){
+                        rec.weights = { homework: hwPct, perform: pfPct };
+                        saveLeaf(['subjects', 'custom'], custom);
+                        renderDailySummarySub(area, data, bucket, findDailySubject(sub.key));
+                    }
+                };
+                area.querySelector('#wHomework').onchange = saveWeights;
+                area.querySelector('#wPerform').onchange = saveWeights;
+            }
         }
+
 
         /* ---------- 段考成績 ---------- */
         function renderExamPanel(el){
@@ -690,13 +742,15 @@
                 <tbody>`;
                 data.students.forEach(s => {
                     let total;
+                    const custRec = customSubjects().find(c => c.id === sub.key);
+                    const weights = weightsForSubject({ hasExam: false, weights: custRec && custRec.weights });
                     if(sub.periodMode === 'split'){
                         const midBucket = ensureDailyBucket(sub.key, 'mid');
                         const finalBucket = ensureDailyBucket(sub.key, 'final');
-                        total = (dailyScore100FromBucket(midBucket, s.id) + dailyScore100FromBucket(finalBucket, s.id)) / 2;
+                        total = (dailyScore100FromBucket(midBucket, s.id, weights) + dailyScore100FromBucket(finalBucket, s.id, weights)) / 2;
                     } else {
                         const bucket = ensureDailyBucket(sub.key, 'single');
-                        total = dailyScore100FromBucket(bucket, s.id);
+                        total = dailyScore100FromBucket(bucket, s.id, weights);
                     }
                     html += `<tr><td class="name-cell">${escapeHtml(s.name)}</td><td class="derived">${fmt(total)}</td><td>${letterGrade(total)}</td><td>${effortLevel100(total)}</td></tr>`;
                 });
