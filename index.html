@@ -111,8 +111,8 @@
 
         .table-wrap { overflow-x: auto; border: 2px solid var(--line); border-radius: 14px; background: var(--surface); }
         table.grid { border-collapse: collapse; width: 100%; min-width: 560px; }
-        table.grid th, table.grid td { padding: 8px 10px; text-align: center; border-bottom: 1px solid var(--line); white-space: nowrap; }
-        table.grid thead th { padding-top: 26px; } /* 多留空間，避免刪除鈕 hover 時的紅圈被上方裁掉 */
+        table.grid th, table.grid td { padding: 8px 6px; text-align: center; border-bottom: 1px solid var(--line); white-space: nowrap; }
+        table.grid thead th { padding-top: 14px; } /* 剛好夠讓刪除鈕 hover 的紅圈完整顯示，不留多餘空間 */
         table.grid th { background: color-mix(in srgb, var(--accent) 12%, var(--surface)); font-weight: normal; color: var(--text); position: sticky; top: 0; }
         table.grid td.name-cell { text-align: center; font-weight: bold; }
         table.grid tr:last-child td { border-bottom: none; }
