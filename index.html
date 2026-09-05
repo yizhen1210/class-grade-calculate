@@ -28,6 +28,9 @@
             --danger: #c4674f;      /* 刪除/警示 */
         }
         * { box-sizing: border-box; }
+        input[type=number] { -moz-appearance: textfield; }
+        input[type=number]::-webkit-inner-spin-button,
+        input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
         body {
             font-family: 'Iansui', system-ui, sans-serif;
             margin: 0; min-height: 100vh;
@@ -109,6 +112,7 @@
         .table-wrap { overflow-x: auto; border: 2px solid var(--line); border-radius: 14px; background: var(--surface); }
         table.grid { border-collapse: collapse; width: 100%; min-width: 560px; }
         table.grid th, table.grid td { padding: 8px 10px; text-align: center; border-bottom: 1px solid var(--line); white-space: nowrap; }
+        table.grid thead th { padding-top: 26px; } /* 多留空間，避免刪除鈕 hover 時的紅圈被上方裁掉 */
         table.grid th { background: color-mix(in srgb, var(--accent) 12%, var(--surface)); font-weight: normal; color: var(--text); position: sticky; top: 0; }
         table.grid td.name-cell { text-align: center; font-weight: bold; }
         table.grid tr:last-child td { border-bottom: none; }
@@ -122,7 +126,7 @@
         .col-name-wrap { position: relative; display: inline-block; }
         td.derived { font-weight: bold; color: var(--accent-dark); }
         td.rank-cell { font-weight: bold; }
-        .col-del-btn { border: none; background: var(--surface); color: var(--danger); cursor: pointer; font-size: 0.75em; border-radius: 50%; width: 18px; height: 18px; transition: background 0.15s; position: absolute; top: -8px; right: -8px; line-height: 1; padding: 0; box-shadow: 0 0 0 1px var(--line); }
+        .col-del-btn { border: none; background: var(--surface); color: var(--danger); cursor: pointer; font-size: 0.75em; border-radius: 50%; width: 18px; height: 18px; transition: background 0.15s; position: absolute; top: -3px; right: -3px; line-height: 1; padding: 0; box-shadow: 0 0 0 1px var(--line); }
         .col-del-btn:hover { background: var(--danger); color: #fff; box-shadow: 0 0 0 1px var(--danger); }
 
 
