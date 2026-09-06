@@ -8,6 +8,8 @@
     <!-- PWA / 桌面圖示：三張 PNG 與此檔同目錄一起上傳，檔名須與 manifest 一致 -->
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
+    <meta name="apple-mobile-web-app-title" content="成績計算">
+    <meta name="application-name" content="成績計算">
     <meta name="theme-color" content="#8c7768">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -72,8 +74,18 @@
         .btn.small { padding: 5px 14px; font-size: 0.85em; }
         .btn.danger { border-color: var(--danger); background: var(--danger); }
         .btn.danger:hover { background: color-mix(in srgb, var(--danger) 80%, #000); border-color: color-mix(in srgb, var(--danger) 80%, #000); }
-        .icon-btn { border: 1px solid var(--line); background: transparent; color: var(--accent); cursor: pointer; font-size: 0.9em; vertical-align: middle; padding: 0; border-radius: 50%; width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; transition: background 0.15s, color 0.15s; }
+        .icon-btn {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 46px; height: 46px; border-radius: 50%;
+            border: 2px solid var(--accent); background: #fff; color: var(--accent);
+            font-size: 24px; padding: 0; margin-left: -6px;
+            transform: translateY(-4px);
+            cursor: pointer; transition: background 0.15s, color 0.15s;
+        }
         .icon-btn:hover { background: var(--accent); color: #fff; }
+        @media (max-width: 640px) {
+            .icon-btn { width: 33px; height: 33px; font-size: 17px; margin-left: -4px; transform: translateY(-4px); }
+        }
         .hidden { display: none; }
 
         .admin-only.hidden { display: none; }
