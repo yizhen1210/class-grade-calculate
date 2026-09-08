@@ -157,6 +157,17 @@
         .hidden { display: none; }
         .admin-only.hidden { display: none; }
 
+        /* 所有按鈕點擊時縮放 0.97 按壓感 */
+        button {
+            transition: transform 0.12s ease, background 0.15s, color 0.15s, border-color 0.15s;
+        }
+        button:active {
+            transform: scale(0.97);
+        }
+        .title-edit-btn:active, .icon-btn:active {
+            transform: translateY(-2px) scale(0.97) !important;
+        }
+
         /* 標題區塊 (header) 單層 Grid */
         header { 
             display: grid; 
@@ -379,6 +390,56 @@
             font-weight: bold;
             color: var(--accent);
         }
+
+        /* ====== 加點確認彈窗樣式（依截圖設計） ====== */
+        .confirm-point-content {
+            background: #ffffff;
+            border: 2px solid var(--line);
+            padding: 38px 46px 34px;
+            border-radius: 28px;
+            text-align: center;
+            box-shadow: 0 20px 55px rgba(0,0,0,0.22);
+            width: min(520px, 92vw);
+        }
+        .confirm-point-msg {
+            font-size: 1.45em;
+            margin: 0 0 28px;
+            color: var(--text);
+            line-height: 1.4;
+            font-weight: normal;
+        }
+        .confirm-point-actions {
+            display: flex;
+            justify-content: center;
+            gap: 22px;
+        }
+        .confirm-btn-cancel {
+            border: 2px solid #8fa2a0;
+            background: #ffffff;
+            color: #728785;
+            border-radius: 50px;
+            padding: 10px 42px;
+            font-size: 1.15em;
+            font-family: inherit;
+            cursor: pointer;
+        }
+        .confirm-btn-cancel:hover {
+            background: #f4f8f8;
+        }
+        .confirm-btn-ok {
+            border: 2px solid #6b8280;
+            background: #6b8280;
+            color: #ffffff;
+            border-radius: 50px;
+            padding: 10px 42px;
+            font-size: 1.15em;
+            font-family: inherit;
+            cursor: pointer;
+        }
+        .confirm-btn-ok:hover {
+            background: #596e6c;
+            border-color: #596e6c;
+        }
     </style>
 </head>
 <body>
@@ -432,6 +493,17 @@
             <div class="modal-actions">
                 <button class="btn-cancel" id="promptNo">取消</button>
                 <button class="btn-ok" id="promptOk">確定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== 加點專用確認彈窗（截圖樣式） ====== -->
+    <div id="confirmPointModal" class="modal-overlay">
+        <div class="confirm-point-content">
+            <p class="confirm-point-msg" id="confirmPointMsg">要幫「01 陳愷寬」加 80 點嗎？</p>
+            <div class="confirm-point-actions">
+                <button class="confirm-btn-cancel" id="confirmPointCancelBtn">取消</button>
+                <button class="confirm-btn-ok" id="confirmPointOkBtn">確定</button>
             </div>
         </div>
     </div>
@@ -517,6 +589,16 @@
         window.showAlert = (msg) => { $('alertMsg').textContent = msg; $('alertModal').style.display = 'flex'; };
         window.closeAlert = () => { $('alertModal').style.display = 'none'; };
         window.closeLogsModal = () => { $('logsModal').style.display = 'none'; };
+
+        /* 依截圖設計之加點確認彈窗 Promise */
+        window.askPointConfirm = (msg) => new Promise(res => {
+            const m = $('confirmPointModal'), ok = $('confirmPointOkBtn'), no = $('confirmPointCancelBtn');
+            $('confirmPointMsg').textContent = msg;
+            m.style.display = 'flex';
+            const done = v => { m.style.display = 'none'; ok.onclick = null; no.onclick = null; res(v); };
+            ok.onclick = () => done(true);
+            no.onclick = () => done(false);
+        });
 
         window.askInput = (msg, def) => new Promise(res => {
             const m = $('promptModal'), inp = $('promptInput'), ok = $('promptOk'), no = $('promptNo');
@@ -644,6 +726,16 @@
             if(!lastData.scores.examFinal) lastData.scores.examFinal = {};
             if(!lastData.pointsAwarded) lastData.pointsAwarded = {}; // 追蹤各項目加點狀態
             if(!Array.isArray(lastData.pointsLog)) lastData.pointsLog = []; // 加點流水帳
+
+            /* 依要求：重置先前測試點擊的加點狀態，將所有學生恢復為未加點 */
+            if(lastData._resetPointsV1 !== true){
+                lastData.pointsAwarded = {};
+                lastData.pointsLog = [];
+                lastData._resetPointsV1 = true;
+                if(isAdmin){
+                    saveData({ pointsAwarded: {}, pointsLog: [], _resetPointsV1: true });
+                }
+            }
 
             const subjectSkeletonList = [
                 ...CORE_SUBJECTS.map(name => ({ key: name, periodMode: 'split' })),
@@ -954,13 +1046,13 @@
             if(isQuiz){
                 const sel = area.querySelector('#quizPointStudentSel');
                 const btn = area.querySelector('#quizCalcPointBtn');
-                btn.onclick = () => {
+                btn.onclick = async () => {
                     const targetSid = sel.value;
                     if(!targetSid){ window.showAlert('請先選擇學生'); return; }
 
                     const targetStudents = targetSid === '__all__' ? data.students : data.students.filter(s => s.id === targetSid);
-                    let totalAddedCount = 0;
-                    let summaryMessages = [];
+                    let eligibleList = [];
+                    let totalPointsToAdd = 0;
 
                     targetStudents.forEach(s => {
                         if(isStudentPulledOut(s, dailySubjectKey)) return;
@@ -975,37 +1067,55 @@
 
                             if(rulePts > 0 && !isAwarded){
                                 studentPoints += rulePts;
-                                itemDetails.push(`${c.name}(${rulePts}點)`);
-                                data.pointsAwarded[itemKey] = {
-                                    points: rulePts,
-                                    time: new Date().toISOString()
-                                };
+                                itemDetails.push({ key: itemKey, name: c.name, points: rulePts });
                             }
                         });
 
                         if(studentPoints > 0){
-                            totalAddedCount++;
-                            summaryMessages.push(`${s.name}：+${studentPoints} 點 [${itemDetails.join('、')}]`);
-                            data.pointsLog.push({
-                                id: newId('pl'),
-                                date: new Date().toISOString(),
-                                studentId: s.id,
-                                studentName: s.name,
-                                points: studentPoints,
-                                itemSummary: `${dailySubjectKey}(${PERIODS[dailyPeriod] || '平時'})平考：${itemDetails.join('、')}`,
-                                type: '平考'
-                            });
+                            eligibleList.push({ student: s, points: studentPoints, items: itemDetails });
+                            totalPointsToAdd += studentPoints;
                         }
                     });
 
-                    if(totalAddedCount > 0){
-                        saveLeaf(['pointsAwarded'], data.pointsAwarded);
-                        saveLeaf(['pointsLog'], data.pointsLog);
-                        renderDailyCategorySub(area, data, bucket, cat);
-                        window.showAlert(`【加點成功】共為 ${totalAddedCount} 位學生完成加點：\n${summaryMessages.join('\n')}`);
-                    } else {
+                    if(!eligibleList.length){
                         window.showAlert('所選學生目前沒有符合條件或尚未加點的平考項目（需為「聽寫」或含「卷」且滿100分，且未曾加過點）。');
+                        return;
                     }
+
+                    // 依截圖彈窗確認
+                    let confirmText = '';
+                    if(targetSid === '__all__'){
+                        confirmText = `要幫「全部學生」加 ${totalPointsToAdd} 點嗎？`;
+                    } else {
+                        const targetStudent = eligibleList[0].student;
+                        const sIdx = data.students.findIndex(st => st.id === targetStudent.id);
+                        const seatNum = String(sIdx + 1).padStart(2, '0');
+                        confirmText = `要幫「${seatNum} ${targetStudent.name}」加 ${eligibleList[0].points} 點嗎？`;
+                    }
+
+                    const ok = await window.askPointConfirm(confirmText);
+                    if(!ok) return;
+
+                    // 使用者確定後才正式寫入點數
+                    eligibleList.forEach(entry => {
+                        const s = entry.student;
+                        entry.items.forEach(it => {
+                            data.pointsAwarded[it.key] = { points: it.points, time: new Date().toISOString() };
+                        });
+                        data.pointsLog.push({
+                            id: newId('pl'),
+                            date: new Date().toISOString(),
+                            studentId: s.id,
+                            studentName: s.name,
+                            points: entry.points,
+                            itemSummary: `${dailySubjectKey}(${PERIODS[dailyPeriod] || '平時'})平考：${entry.items.map(it => `${it.name}(${it.points}點)`).join('、')}`,
+                            type: '平考'
+                        });
+                    });
+
+                    saveLeaf(['pointsAwarded'], data.pointsAwarded);
+                    saveLeaf(['pointsLog'], data.pointsLog);
+                    renderDailyCategorySub(area, data, bucket, cat);
                 };
 
                 area.querySelector('#quizLoadLogsBtn').onclick = () => openLogsModal();
@@ -1184,13 +1294,13 @@
 
             const sel = el.querySelector('#examPointStudentSel');
             const btn = el.querySelector('#examCalcPointBtn');
-            btn.onclick = () => {
+            btn.onclick = async () => {
                 const targetSid = sel.value;
                 if(!targetSid){ window.showAlert('請先選擇學生'); return; }
 
                 const targetStudents = targetSid === '__all__' ? data.students : data.students.filter(s => s.id === targetSid);
-                let totalAddedCount = 0;
-                let summaryMessages = [];
+                let eligibleList = [];
+                let totalPointsToAdd = 0;
 
                 targetStudents.forEach(s => {
                     const rec = bucket[s.id] || {};
@@ -1205,37 +1315,55 @@
 
                         if(rulePts > 0 && !isAwarded){
                             studentPoints += rulePts;
-                            itemDetails.push(`${sub}${val}分(+${rulePts}點)`);
-                            data.pointsAwarded[itemKey] = {
-                                points: rulePts,
-                                time: new Date().toISOString()
-                            };
+                            itemDetails.push({ key: itemKey, sub, val, points: rulePts });
                         }
                     });
 
                     if(studentPoints > 0){
-                        totalAddedCount++;
-                        summaryMessages.push(`${s.name}：+${studentPoints} 點 [${itemDetails.join('、')}]`);
-                        data.pointsLog.push({
-                            id: newId('pl'),
-                            date: new Date().toISOString(),
-                            studentId: s.id,
-                            studentName: s.name,
-                            points: studentPoints,
-                            itemSummary: `${PERIODS[examPeriod]}段考：${itemDetails.join('、')}`,
-                            type: '段考'
-                        });
+                        eligibleList.push({ student: s, points: studentPoints, items: itemDetails });
+                        totalPointsToAdd += studentPoints;
                     }
                 });
 
-                if(totalAddedCount > 0){
-                    saveLeaf(['pointsAwarded'], data.pointsAwarded);
-                    saveLeaf(['pointsLog'], data.pointsLog);
-                    renderExamPanel(el);
-                    window.showAlert(`【加點成功】共為 ${totalAddedCount} 位學生完成段考加點：\n${summaryMessages.join('\n')}`);
-                } else {
+                if(!eligibleList.length){
                     window.showAlert('所選學生目前沒有符合條件或尚未加點的段考科目（需達80分以上，且未曾加過點）。');
+                    return;
                 }
+
+                // 依截圖彈窗確認
+                let confirmText = '';
+                if(targetSid === '__all__'){
+                    confirmText = `要幫「全部學生」加 ${totalPointsToAdd} 點嗎？`;
+                } else {
+                    const targetStudent = eligibleList[0].student;
+                    const sIdx = data.students.findIndex(st => st.id === targetStudent.id);
+                    const seatNum = String(sIdx + 1).padStart(2, '0');
+                    confirmText = `要幫「${seatNum} ${targetStudent.name}」加 ${eligibleList[0].points} 點嗎？`;
+                }
+
+                const ok = await window.askPointConfirm(confirmText);
+                if(!ok) return;
+
+                // 使用者確定後才正式寫入點數
+                eligibleList.forEach(entry => {
+                    const s = entry.student;
+                    entry.items.forEach(it => {
+                        data.pointsAwarded[it.key] = { points: it.points, time: new Date().toISOString() };
+                    });
+                    data.pointsLog.push({
+                        id: newId('pl'),
+                        date: new Date().toISOString(),
+                        studentId: s.id,
+                        studentName: s.name,
+                        points: entry.points,
+                        itemSummary: `${PERIODS[examPeriod]}段考：${entry.items.map(it => `${it.sub}${it.val}分(+${it.points}點)`).join('、')}`,
+                        type: '段考'
+                    });
+                });
+
+                saveLeaf(['pointsAwarded'], data.pointsAwarded);
+                saveLeaf(['pointsLog'], data.pointsLog);
+                renderExamPanel(el);
             };
 
             el.querySelector('#examLoadLogsBtn').onclick = () => openLogsModal();
