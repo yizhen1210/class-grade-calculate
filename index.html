@@ -183,7 +183,7 @@
 
         .empty-note { text-align: center; color: var(--muted); padding: 60px 20px; font-size: 1.1em; }
 
-        /* 主分頁按鈕：放大字級與內距 */
+        /* 主分頁按鈕 */
         .tabs { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
         .tab-btn { 
             padding: 10px 24px; 
@@ -203,7 +203,7 @@
         .tab-panel { display: none; }
         .tab-panel.active { display: block; }
 
-        /* 下拉工具列與次分頁按鈕：放大文字提高閱讀性 */
+        /* 下拉工具列與次分頁按鈕 */
         .toolbar { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-bottom: 18px; }
         .toolbar select, .toolbar input[type=text] { padding: 9px 16px; border-radius: 12px; border: 2px solid var(--line); background: var(--surface); color: var(--text); font-family: inherit; font-size: 1.05em; }
         .toolbar label { font-size: 1.05em; color: var(--muted); font-weight: 500; }
@@ -213,7 +213,6 @@
         .subtabs-row .subtabs { margin-bottom: 0; }
         .subtabs-actions { display: flex; gap: 10px; flex-wrap: wrap; }
         
-        /* 次分頁按鈕（1 作業、2 平考...） */
         .subtab-btn { 
             padding: 8px 18px; 
             border-radius: 50px; 
@@ -272,6 +271,114 @@
         .subject-add-form { display: flex; align-items: center; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
         .subject-add-form input[type=text] { padding: 8px 14px; border: 2px solid var(--line); border-radius: 10px; font-family: inherit; background: var(--surface); color: var(--text); }
         .subject-add-form select { padding: 8px 14px; border: 2px solid var(--line); border-radius: 10px; font-family: inherit; background: var(--surface); color: var(--text); }
+
+        /* ---- 加點與匯出區塊樣式 ---- */
+        .point-card {
+            background: var(--surface);
+            border: 2px solid var(--line);
+            border-radius: 20px;
+            padding: 24px 28px;
+            margin-top: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.02);
+        }
+        .point-card-title {
+            font-size: 1.25em;
+            font-weight: bold;
+            margin: 0 0 6px;
+            color: var(--text);
+        }
+        .point-card-desc {
+            color: var(--muted);
+            font-size: 0.95em;
+            margin: 0 0 16px;
+        }
+        .point-action-row {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .point-select {
+            flex: 1;
+            min-width: 240px;
+            padding: 12px 18px;
+            border-radius: 14px;
+            border: 2px solid var(--line);
+            background: var(--surface);
+            font-family: inherit;
+            font-size: 1.05em;
+            color: var(--text);
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .point-select:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 8px 2px var(--focus-glow);
+        }
+        .point-btn-primary {
+            padding: 11px 30px;
+            border-radius: 50px;
+            border: 2px solid var(--accent);
+            background: var(--accent);
+            color: #fff;
+            font-family: inherit;
+            font-size: 1.05em;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s;
+        }
+        .point-btn-primary:hover {
+            background: var(--accent-dark);
+            border-color: var(--accent-dark);
+        }
+        .point-btn-primary:active {
+            transform: scale(0.97);
+        }
+        .point-btn-outline {
+            padding: 10px 24px;
+            border-radius: 50px;
+            border: 2px solid var(--accent);
+            background: transparent;
+            color: var(--accent);
+            font-family: inherit;
+            font-size: 1.05em;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s;
+        }
+        .point-btn-outline:hover {
+            background: var(--accent);
+            color: #fff;
+        }
+        .point-btn-outline:active {
+            transform: scale(0.97);
+        }
+
+        /* 表格內標記已加點與點數狀態 */
+        .point-badge {
+            display: inline-block;
+            font-size: 0.78em;
+            line-height: 1.2;
+            padding: 2px 6px;
+            border-radius: 6px;
+            margin-top: 3px;
+        }
+        .point-badge.awarded {
+            background: #ede8e3;
+            color: var(--accent-dark);
+            border: 1px solid var(--line);
+            font-weight: bold;
+        }
+        .point-badge.eligible {
+            background: #e6f4ea;
+            color: #137333;
+            border: 1px solid #ceead6;
+            font-weight: bold;
+        }
+        td.point-cell {
+            font-weight: bold;
+            color: var(--accent);
+        }
     </style>
 </head>
 <body>
@@ -310,7 +417,7 @@
     <!-- ====== 通用提示框 ====== -->
     <div id="alertModal" class="modal-overlay">
         <div class="modal-content">
-            <p class="modal-title" id="alertMsg"></p>
+            <p class="modal-title" id="alertMsg" style="white-space:pre-line;line-height:1.5;"></p>
             <div class="modal-actions">
                 <button class="btn-ok" onclick="closeAlert()">確定</button>
             </div>
@@ -325,6 +432,17 @@
             <div class="modal-actions">
                 <button class="btn-cancel" id="promptNo">取消</button>
                 <button class="btn-ok" id="promptOk">確定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== 加點紀錄檢視彈窗 ====== -->
+    <div id="logsModal" class="modal-overlay">
+        <div class="modal-content" style="width:min(680px,94vw);max-height:85vh;display:flex;flex-direction:column;padding:30px 24px;">
+            <p class="modal-title" style="margin-bottom:14px;">加點歷史紀錄</p>
+            <div id="logsListWrap" style="overflow-y:auto;flex:1;border:2px solid var(--line);border-radius:12px;margin-bottom:20px;padding:8px;background:var(--surface);"></div>
+            <div class="modal-actions">
+                <button class="btn-ok" onclick="closeLogsModal()">關閉</button>
             </div>
         </div>
     </div>
@@ -398,6 +516,7 @@
 
         window.showAlert = (msg) => { $('alertMsg').textContent = msg; $('alertModal').style.display = 'flex'; };
         window.closeAlert = () => { $('alertModal').style.display = 'none'; };
+        window.closeLogsModal = () => { $('logsModal').style.display = 'none'; };
 
         window.askInput = (msg, def) => new Promise(res => {
             const m = $('promptModal'), inp = $('promptInput'), ok = $('promptOk'), no = $('promptNo');
@@ -438,7 +557,6 @@
         $('passInput').addEventListener('input', e => { if(!e.isComposing) checkIME(); });
         $('passInput').addEventListener('compositionend', checkIME);
 
-        /* ========== 業務邏輯 ========== */
         const CORE_SUBJECTS = ['國語', '數學'];
         function isStudentPulledOut(student, subjectKey){ return CORE_SUBJECTS.includes(subjectKey) && !!(student.pullout && student.pullout[subjectKey]); }
         const EXAM_ONLY = ['自然', '社會', '英文'];
@@ -465,6 +583,27 @@
 
         function rankOf(value, allValues){ return 1 + allValues.filter(v => v > value).length; }
         function newId(prefix){ return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+        /* ---------- 加點計算規則函數 ---------- */
+        // 平考：若項目名稱是聽寫，只有100可以加，一次加50點；若項目名稱有卷，只有100可以加，一次加100點
+        function getQuizItemRulePoints(colName, scoreVal){
+            if(scoreVal === null || scoreVal === undefined || scoreVal === '') return 0;
+            const s = Number(scoreVal);
+            if(s !== 100) return 0;
+            if(colName.includes('聽寫')) return 50;
+            if(colName.includes('卷')) return 100;
+            return 0;
+        }
+
+        // 段考：不管科目，只要100就加500點、90分以上加300點、80分以上加100點
+        function getExamItemRulePoints(scoreVal){
+            if(scoreVal === null || scoreVal === undefined || scoreVal === '') return 0;
+            const s = Number(scoreVal);
+            if(s >= 100) return 500;
+            if(s >= 90) return 300;
+            if(s >= 80) return 100;
+            return 0;
+        }
 
         const DEFAULT_CUSTOM_WEIGHTS = { homework: 50, perform: 50 };
         function customSubjects(){ return state().subjects.custom; }
@@ -503,6 +642,9 @@
             if(!lastData.scores.daily) lastData.scores.daily = {};
             if(!lastData.scores.examMid) lastData.scores.examMid = {};
             if(!lastData.scores.examFinal) lastData.scores.examFinal = {};
+            if(!lastData.pointsAwarded) lastData.pointsAwarded = {}; // 追蹤各項目加點狀態
+            if(!Array.isArray(lastData.pointsLog)) lastData.pointsLog = []; // 加點流水帳
+
             const subjectSkeletonList = [
                 ...CORE_SUBJECTS.map(name => ({ key: name, periodMode: 'split' })),
                 ...lastData.subjects.custom.map(c => ({ key: c.id, periodMode: c.periodMode }))
@@ -678,26 +820,101 @@
 
         function renderDailyCategorySub(area, data, bucket, cat){
             const catBucket = bucket[cat];
+            const isQuiz = (cat === 'quiz');
+
+            let hintMessage = '每一欄可自訂名稱（例如「第1次習作」），成績以 0–100 分登記；學生的「平均」為該生已填欄位的平均分數。';
+            if(isQuiz){
+                hintMessage = '平考加點規則：項目名稱含「聽寫」滿100分加50點；項目名稱含「卷」滿100分加100點。已加點會標示標籤。';
+            }
+
             area.innerHTML = `
-                <p class="hint-text">每一欄可自訂名稱（例如「第1次習作」），成績以 0–100 分登記；學生的「平均」為該生已填欄位的平均分數。</p>
+                <p class="hint-text">${hintMessage}</p>
                 <div class="table-wrap">
                     <table class="grid">
-                        <thead><tr><th>姓名</th>${catBucket.columns.map(c => `<th><span class="col-name-wrap"><input type="text" data-col="${c.id}" value="${escapeHtml(c.name)}" style="width:${colBoxWidth(c.name)}px"><button class="col-del-btn" data-col="${c.id}" title="刪除此欄">✕</button></span></th>`).join('')}<th>平均</th></tr></thead>
+                        <thead>
+                            <tr>
+                                <th>姓名</th>
+                                ${catBucket.columns.map(c => `<th><span class="col-name-wrap"><input type="text" data-col="${c.id}" value="${escapeHtml(c.name)}" style="width:${colBoxWidth(c.name)}px"><button class="col-del-btn" data-col="${c.id}" title="刪除此欄">✕</button></span></th>`).join('')}
+                                <th>平均</th>
+                                ${isQuiz ? `<th>加點</th>` : ''}
+                            </tr>
+                        </thead>
                         <tbody id="catBody"></tbody>
                     </table>
                 </div>
+                ${isQuiz ? `
+                <!-- ====== 加點卡片 ====== -->
+                <div class="point-card">
+                    <div class="point-card-title">加點</div>
+                    <div class="point-card-desc">選學生後按「計算並加點」。</div>
+                    <div class="point-action-row">
+                        <select class="point-select" id="quizPointStudentSel">
+                            <option value="">請選擇學生</option>
+                            <option value="__all__">全部學生（一鍵全部加點）</option>
+                            ${data.students.map((s, idx) => `<option value="${s.id}">${idx + 1}. ${escapeHtml(s.name)}</option>`).join('')}
+                        </select>
+                        <button class="point-btn-primary" id="quizCalcPointBtn">計算並加點</button>
+                    </div>
+                </div>
+
+                <!-- ====== 加點紀錄匯出卡片 ====== -->
+                <div class="point-card">
+                    <div class="point-card-title">加點紀錄匯出</div>
+                    <div class="point-action-row">
+                        <button class="point-btn-outline" id="quizLoadLogsBtn">載入加點紀錄</button>
+                        <button class="point-btn-outline" id="quizExportTodayBtn">匯出今天的加點紀錄</button>
+                    </div>
+                </div>
+                ` : ''}
             `;
+
             const body = area.querySelector('#catBody');
             data.students.forEach(s => {
                 const pulledOut = isStudentPulledOut(s, dailySubjectKey);
                 const tr = document.createElement('tr');
                 if(pulledOut){
-                    tr.innerHTML = `<td class="name-cell">${escapeHtml(s.name)}</td>${catBucket.columns.map(() => `<td>－</td>`).join('')}<td class="derived">抽離</td>`;
+                    tr.innerHTML = `<td class="name-cell">${escapeHtml(s.name)}</td>${catBucket.columns.map(() => `<td>－</td>`).join('')}<td class="derived">抽離</td>${isQuiz ? `<td>－</td>` : ''}`;
                     body.appendChild(tr);
                     return;
                 }
                 const avg = categoryAverage(catBucket, s.id);
-                tr.innerHTML = `<td class="name-cell">${escapeHtml(s.name)}</td>${catBucket.columns.map(c => `<td><input type="number" min="0" max="100" step="0.5" data-col="${c.id}" style="width:${colBoxWidth(c.name)}px" value="${getLeaf(catBucket.values[s.id], c.id) ?? ''}"></td>`).join('')}<td class="derived" data-f="avg">${avg !== null ? fmt(avg) : '-'}</td>`;
+
+                // 計算可加點數與已加點數
+                let pendingPts = 0;
+                let awardedPts = 0;
+
+                const colsHtml = catBucket.columns.map(c => {
+                    const val = getLeaf(catBucket.values[s.id], c.id);
+                    let badgeHtml = '';
+                    if(isQuiz){
+                        const rulePts = getQuizItemRulePoints(c.name, val);
+                        const itemKey = `quiz_${dailySubjectKey}_${dailyPeriod}_${c.id}_${s.id}`;
+                        const isAwarded = !!(data.pointsAwarded && data.pointsAwarded[itemKey]);
+
+                        if(isAwarded){
+                            awardedPts += rulePts;
+                            badgeHtml = `<br><span class="point-badge awarded">已加點</span>`;
+                        } else if(rulePts > 0){
+                            pendingPts += rulePts;
+                            badgeHtml = `<br><span class="point-badge eligible">+${rulePts}點</span>`;
+                        }
+                    }
+                    return `<td><input type="number" min="0" max="100" step="0.5" data-col="${c.id}" style="width:${colBoxWidth(c.name)}px" value="${val ?? ''}">${badgeHtml}</td>`;
+                }).join('');
+
+                let pointCellHtml = '';
+                if(isQuiz){
+                    let text = '-';
+                    if(pendingPts > 0){
+                        text = `+${pendingPts} 點`;
+                    } else if(awardedPts > 0){
+                        text = `已加 ${awardedPts} 點`;
+                    }
+                    pointCellHtml = `<td class="point-cell" data-f="points">${text}</td>`;
+                }
+
+                tr.innerHTML = `<td class="name-cell">${escapeHtml(s.name)}</td>${colsHtml}<td class="derived" data-f="avg">${avg !== null ? fmt(avg) : '-'}</td>${pointCellHtml}`;
+
                 catBucket.columns.forEach(c => {
                     const inp = tr.querySelector(`input[data-col="${c.id}"]`);
                     inp.oninput = () => {
@@ -709,10 +926,12 @@
                         if(!catBucket.values[s.id]) catBucket.values[s.id] = {};
                         catBucket.values[s.id][c.id] = v === '' ? null : num(v);
                         saveLeaf(['scores', 'daily', dailySubjectKey, dailyPeriod, cat, 'values', s.id], catBucket.values[s.id]);
+                        renderDailyCategorySub(area, data, bucket, cat);
                     };
                 });
                 body.appendChild(tr);
             });
+
             area.querySelectorAll('.col-del-btn').forEach(btn => btn.onclick = async () => {
                 const ok = await askConfirm('確定刪除這一欄？');
                 if(ok){
@@ -721,6 +940,7 @@
                     renderDailyCategorySub(area, data, bucket, cat);
                 }
             });
+
             area.querySelectorAll('th input[type=text]').forEach(inp => {
                 inp.oninput = () => { inp.style.width = colBoxWidth(inp.value) + 'px'; };
                 inp.onchange = e => {
@@ -730,6 +950,67 @@
                     renderDailyCategorySub(area, data, bucket, cat);
                 };
             });
+
+            if(isQuiz){
+                const sel = area.querySelector('#quizPointStudentSel');
+                const btn = area.querySelector('#quizCalcPointBtn');
+                btn.onclick = () => {
+                    const targetSid = sel.value;
+                    if(!targetSid){ window.showAlert('請先選擇學生'); return; }
+
+                    const targetStudents = targetSid === '__all__' ? data.students : data.students.filter(s => s.id === targetSid);
+                    let totalAddedCount = 0;
+                    let summaryMessages = [];
+
+                    targetStudents.forEach(s => {
+                        if(isStudentPulledOut(s, dailySubjectKey)) return;
+                        let studentPoints = 0;
+                        let itemDetails = [];
+
+                        catBucket.columns.forEach(c => {
+                            const val = getLeaf(catBucket.values[s.id], c.id);
+                            const rulePts = getQuizItemRulePoints(c.name, val);
+                            const itemKey = `quiz_${dailySubjectKey}_${dailyPeriod}_${c.id}_${s.id}`;
+                            const isAwarded = !!(data.pointsAwarded && data.pointsAwarded[itemKey]);
+
+                            if(rulePts > 0 && !isAwarded){
+                                studentPoints += rulePts;
+                                itemDetails.push(`${c.name}(${rulePts}點)`);
+                                data.pointsAwarded[itemKey] = {
+                                    points: rulePts,
+                                    time: new Date().toISOString()
+                                };
+                            }
+                        });
+
+                        if(studentPoints > 0){
+                            totalAddedCount++;
+                            summaryMessages.push(`${s.name}：+${studentPoints} 點 [${itemDetails.join('、')}]`);
+                            data.pointsLog.push({
+                                id: newId('pl'),
+                                date: new Date().toISOString(),
+                                studentId: s.id,
+                                studentName: s.name,
+                                points: studentPoints,
+                                itemSummary: `${dailySubjectKey}(${PERIODS[dailyPeriod] || '平時'})平考：${itemDetails.join('、')}`,
+                                type: '平考'
+                            });
+                        }
+                    });
+
+                    if(totalAddedCount > 0){
+                        saveLeaf(['pointsAwarded'], data.pointsAwarded);
+                        saveLeaf(['pointsLog'], data.pointsLog);
+                        renderDailyCategorySub(area, data, bucket, cat);
+                        window.showAlert(`【加點成功】共為 ${totalAddedCount} 位學生完成加點：\n${summaryMessages.join('\n')}`);
+                    } else {
+                        window.showAlert('所選學生目前沒有符合條件或尚未加點的平考項目（需為「聽寫」或含「卷」且滿100分，且未曾加過點）。');
+                    }
+                };
+
+                area.querySelector('#quizLoadLogsBtn').onclick = () => openLogsModal();
+                area.querySelector('#quizExportTodayBtn').onclick = () => exportTodayPoints();
+            }
         }
 
         function renderDailySummarySub(area, data, bucket, sub){
@@ -791,16 +1072,47 @@
         function renderExamPanel(el){
             const data = state();
             el.innerHTML = `
-                <p class="hint-text">加權總分 ＝ 國語×5＋數學×4＋自然×3＋社會×3＋英文×2（用於班排名，比重沿用原始段考表）</p>
+                <p class="hint-text">加權總分 ＝ 國語×5＋數學×4＋自然×3＋社會×3＋英文×2（用於班排名，比重沿用原始段考表）。段考加點規則：100分加500點、90分以上加300點、80分以上加100點。</p>
                 <div class="toolbar">
                     <label>期別</label>
                     <select id="examPeriodSel">${Object.entries(PERIODS).map(([k, v]) => `<option value="${k}" ${k === examPeriod ? 'selected' : ''}>${v}</option>`).join('')}</select>
                 </div>
                 <div class="table-wrap">
                     <table class="grid">
-                        <thead><tr><th>姓名</th>${EXAM_SUBJECTS.map(s => `<th>${s}</th>`).join('')}<th>加權總分</th><th>排名</th></tr></thead>
+                        <thead>
+                            <tr>
+                                <th>姓名</th>
+                                ${EXAM_SUBJECTS.map(s => `<th>${s}</th>`).join('')}
+                                <th>加權總分</th>
+                                <th>排名</th>
+                                <th>加點</th>
+                            </tr>
+                        </thead>
                         <tbody id="examBody"></tbody>
                     </table>
+                </div>
+
+                <!-- ====== 加點卡片 ====== -->
+                <div class="point-card">
+                    <div class="point-card-title">加點</div>
+                    <div class="point-card-desc">選學生後按「計算並加點」。</div>
+                    <div class="point-action-row">
+                        <select class="point-select" id="examPointStudentSel">
+                            <option value="">請選擇學生</option>
+                            <option value="__all__">全部學生（一鍵全部加點）</option>
+                            ${data.students.map((s, idx) => `<option value="${s.id}">${idx + 1}. ${escapeHtml(s.name)}</option>`).join('')}
+                        </select>
+                        <button class="point-btn-primary" id="examCalcPointBtn">計算並加點</button>
+                    </div>
+                </div>
+
+                <!-- ====== 加點紀錄匯出卡片 ====== -->
+                <div class="point-card">
+                    <div class="point-card-title">加點紀錄匯出</div>
+                    <div class="point-action-row">
+                        <button class="point-btn-outline" id="examLoadLogsBtn">載入加點紀錄</button>
+                        <button class="point-btn-outline" id="examExportTodayBtn">匯出今天的加點紀錄</button>
+                    </div>
                 </div>
             `;
             el.querySelector('#examPeriodSel').onchange = e => { examPeriod = e.target.value; renderExamPanel(el); };
@@ -817,12 +1129,43 @@
             data.students.forEach((s, idx) => {
                 const rec = bucket[s.id] || {};
                 const tr = document.createElement('tr');
+
+                let pendingPts = 0;
+                let awardedPts = 0;
+
+                const subjectCellsHtml = EXAM_SUBJECTS.map(sub => {
+                    const val = getLeaf(rec, sub);
+                    const rulePts = getExamItemRulePoints(val);
+                    const itemKey = `exam_${examPeriod}_${sub}_${s.id}`;
+                    const isAwarded = !!(data.pointsAwarded && data.pointsAwarded[itemKey]);
+
+                    let badgeHtml = '';
+                    if(isAwarded){
+                        awardedPts += rulePts;
+                        badgeHtml = `<br><span class="point-badge awarded">已加點</span>`;
+                    } else if(rulePts > 0){
+                        pendingPts += rulePts;
+                        badgeHtml = `<br><span class="point-badge eligible">+${rulePts}點</span>`;
+                    }
+
+                    return `<td><input type="number" min="0" max="100" step="0.5" data-sub="${sub}" value="${val ?? ''}">${badgeHtml}</td>`;
+                }).join('');
+
+                let pointText = '-';
+                if(pendingPts > 0){
+                    pointText = `+${pendingPts} 點`;
+                } else if(awardedPts > 0){
+                    pointText = `已加 ${awardedPts} 點`;
+                }
+
                 tr.innerHTML = `
                     <td class="name-cell">${escapeHtml(s.name)}</td>
-                    ${EXAM_SUBJECTS.map(sub => `<td><input type="number" min="0" max="100" step="0.5" data-sub="${sub}" value="${getLeaf(rec, sub) ?? ''}"></td>`).join('')}
+                    ${subjectCellsHtml}
                     <td class="derived" data-f="total">${fmt(allTotals[idx])}</td>
                     <td class="rank-cell" data-f="rank">${rankOf(allTotals[idx], allTotals)}</td>
+                    <td class="point-cell" data-f="points">${pointText}</td>
                 `;
+
                 EXAM_SUBJECTS.forEach(sub => {
                     const inp = tr.querySelector(`[data-sub="${sub}"]`);
                     const recalcRow = () => {
@@ -838,6 +1181,141 @@
                 });
                 body.appendChild(tr);
             });
+
+            const sel = el.querySelector('#examPointStudentSel');
+            const btn = el.querySelector('#examCalcPointBtn');
+            btn.onclick = () => {
+                const targetSid = sel.value;
+                if(!targetSid){ window.showAlert('請先選擇學生'); return; }
+
+                const targetStudents = targetSid === '__all__' ? data.students : data.students.filter(s => s.id === targetSid);
+                let totalAddedCount = 0;
+                let summaryMessages = [];
+
+                targetStudents.forEach(s => {
+                    const rec = bucket[s.id] || {};
+                    let studentPoints = 0;
+                    let itemDetails = [];
+
+                    EXAM_SUBJECTS.forEach(sub => {
+                        const val = getLeaf(rec, sub);
+                        const rulePts = getExamItemRulePoints(val);
+                        const itemKey = `exam_${examPeriod}_${sub}_${s.id}`;
+                        const isAwarded = !!(data.pointsAwarded && data.pointsAwarded[itemKey]);
+
+                        if(rulePts > 0 && !isAwarded){
+                            studentPoints += rulePts;
+                            itemDetails.push(`${sub}${val}分(+${rulePts}點)`);
+                            data.pointsAwarded[itemKey] = {
+                                points: rulePts,
+                                time: new Date().toISOString()
+                            };
+                        }
+                    });
+
+                    if(studentPoints > 0){
+                        totalAddedCount++;
+                        summaryMessages.push(`${s.name}：+${studentPoints} 點 [${itemDetails.join('、')}]`);
+                        data.pointsLog.push({
+                            id: newId('pl'),
+                            date: new Date().toISOString(),
+                            studentId: s.id,
+                            studentName: s.name,
+                            points: studentPoints,
+                            itemSummary: `${PERIODS[examPeriod]}段考：${itemDetails.join('、')}`,
+                            type: '段考'
+                        });
+                    }
+                });
+
+                if(totalAddedCount > 0){
+                    saveLeaf(['pointsAwarded'], data.pointsAwarded);
+                    saveLeaf(['pointsLog'], data.pointsLog);
+                    renderExamPanel(el);
+                    window.showAlert(`【加點成功】共為 ${totalAddedCount} 位學生完成段考加點：\n${summaryMessages.join('\n')}`);
+                } else {
+                    window.showAlert('所選學生目前沒有符合條件或尚未加點的段考科目（需達80分以上，且未曾加過點）。');
+                }
+            };
+
+            el.querySelector('#examLoadLogsBtn').onclick = () => openLogsModal();
+            el.querySelector('#examExportTodayBtn').onclick = () => exportTodayPoints();
+        }
+
+        function openLogsModal(){
+            const data = state();
+            const wrap = $('logsListWrap');
+            const logs = Array.isArray(data.pointsLog) ? data.pointsLog : [];
+
+            if(!logs.length){
+                wrap.innerHTML = '<p class="empty-note" style="padding:30px 10px;">目前尚無任何加點紀錄。</p>';
+            } else {
+                wrap.innerHTML = `
+                    <table class="grid" style="min-width:100%;font-size:0.92em;">
+                        <thead>
+                            <tr>
+                                <th>時間</th>
+                                <th>學生姓名</th>
+                                <th>類別</th>
+                                <th>點數</th>
+                                <th>項目明細</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${logs.slice().reverse().map(l => `
+                                <tr>
+                                    <td style="font-size:0.85em;color:var(--muted);">${new Date(l.date).toLocaleString('zh-TW')}</td>
+                                    <td><strong>${escapeHtml(l.studentName)}</strong></td>
+                                    <td>${escapeHtml(l.type)}</td>
+                                    <td style="color:#137333;font-weight:bold;">+${l.points}</td>
+                                    <td style="text-align:left;font-size:0.9em;">${escapeHtml(l.itemSummary)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            }
+            $('logsModal').style.display = 'flex';
+        }
+
+        function exportTodayPoints(){
+            const data = state();
+            const logs = Array.isArray(data.pointsLog) ? data.pointsLog : [];
+            const now = new Date();
+            const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+            const todayLogs = logs.filter(l => {
+                const d = new Date(l.date);
+                const itemDateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                return itemDateStr === todayStr;
+            });
+
+            if(!todayLogs.length){
+                window.showAlert(`今天（${todayStr}）尚未有任何加點紀錄。`);
+                return;
+            }
+
+            const header = ['時間', '學生姓名', '類別', '獲得點數', '項目明細'];
+            const rows = todayLogs.map(l => [
+                new Date(l.date).toLocaleString('zh-TW'),
+                l.studentName,
+                l.type,
+                l.points,
+                `"${(l.itemSummary || '').replace(/"/g, '""')}"`
+            ]);
+
+            const csvContent = "\uFEFF" + [header.join(','), ...rows.map(r => r.join(','))].join('\r\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `班級加點紀錄_${todayStr}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            window.showAlert(`已成功匯出今天共 ${todayLogs.length} 筆加點紀錄！`);
         }
 
         let summarySubjectKey = null;
