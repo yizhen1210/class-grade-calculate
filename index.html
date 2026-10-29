@@ -250,8 +250,9 @@
         table.grid { border-collapse: collapse; width: 100%; min-width: 560px; }
         table.grid th, table.grid td { padding: 8px 6px; text-align: center; border-bottom: 1px solid var(--line); white-space: nowrap; }
         table.grid thead th { padding-top: 14px; }
-        table.grid th { background: color-mix(in srgb, var(--accent) 12%, var(--surface)); font-weight: normal; color: var(--text); position: sticky; top: 0; }
-        table.grid td.name-cell { text-align: center; font-weight: bold; }
+        table.grid th { background: color-mix(in srgb, var(--accent) 12%, var(--surface)); font-weight: normal; color: var(--text); position: sticky; top: 0; z-index: 2; }
+        table.grid th.name-col { position: sticky; left: 0; z-index: 4; box-shadow: 1px 0 0 var(--line); }
+        table.grid td.name-cell { text-align: center; font-weight: bold; position: sticky; left: 0; z-index: 1; background: var(--surface); box-shadow: 1px 0 0 var(--line); }
         table.grid tr:last-child td { border-bottom: none; }
         table.grid input[type=number] { width: 74px; padding: 6px 4px; border: 2px solid var(--line); border-radius: 8px; text-align: center; font-family: inherit; font-size: 0.95em; background: var(--surface); color: var(--text); }
         table.grid input[type=number]:focus { border-color: var(--accent); box-shadow: 0 0 8px 2px var(--focus-glow); outline: none; }
@@ -1078,7 +1079,7 @@
                     <table class="grid">
                         <thead>
                             <tr>
-                                <th>姓名</th>
+                                <th class="name-col">姓名</th>
                                 ${catBucket.columns.map(c => `<th><span class="col-name-wrap"><input type="text" data-col="${c.id}" value="${escapeHtml(c.name)}" style="width:${colBoxWidth(c.name)}px"><button class="col-del-btn" data-col="${c.id}" title="刪除此欄">✕</button></span></th>`).join('')}
                                 <th>${isCoreHw ? '作業成績' : '平均'}</th>
                                 ${isQuiz ? `<th>加點</th>` : ''}
@@ -1339,7 +1340,7 @@
                 <p class="hint-text">${formulaText}</p>
                 <div class="table-wrap">
                     <table class="grid">
-                        <thead><tr><th>姓名</th><th>${sub.hasExam ? '作業成績' : '作業平均'}</th>${sub.hasExam ? '<th>平考平均</th>' : ''}<th>表現平均</th><th>平時分數</th></tr></thead>
+                        <thead><tr><th class="name-col">姓名</th><th>${sub.hasExam ? '作業成績' : '作業平均'}</th>${sub.hasExam ? '<th>平考平均</th>' : ''}<th>表現平均</th><th>平時分數</th></tr></thead>
                         <tbody>${data.students.map(s => {
                             const pulledOut = isStudentPulledOut(s, sub.key);
                             if(pulledOut){
@@ -1389,7 +1390,7 @@
                     <table class="grid">
                         <thead>
                             <tr>
-                                <th>姓名</th>
+                                <th class="name-col">姓名</th>
                                 ${EXAM_SUBJECTS.map(s => `<th>${s}</th>`).join('')}
                                 <th>加權總分</th>
                                 <th>排名</th>
@@ -1686,7 +1687,7 @@
             if(sub.isCore){
                 html += `<p class="hint-text">總分 ＝ 期中平時×0.25 ＋ 期末平時×0.25 ＋ 期中段考×0.25 ＋ 期末段考×0.25</p>
                 <div class="table-wrap"><table class="grid">
-                <thead><tr><th>姓名</th><th>期中平時</th><th>期末平時</th><th>期中段考</th><th>期末段考</th><th>總分</th><th>等第</th><th>努力程度</th></tr></thead>
+                <thead><tr><th class="name-col">姓名</th><th>期中平時</th><th>期末平時</th><th>期中段考</th><th>期末段考</th><th>總分</th><th>等第</th><th>努力程度</th></tr></thead>
                 <tbody>`;
                 const midBucket = ensureDailyBucket(sub.key, 'mid');
                 const finalBucket = ensureDailyBucket(sub.key, 'final');
@@ -1703,7 +1704,7 @@
                 html += `</tbody></table></div>`;
             } else {
                 html += `<div class="table-wrap"><table class="grid">
-                <thead><tr><th>姓名</th><th>平時分數</th><th>等第</th><th>努力程度</th></tr></thead>
+                <thead><tr><th class="name-col">姓名</th><th>平時分數</th><th>等第</th><th>努力程度</th></tr></thead>
                 <tbody>`;
                 data.students.forEach(s => {
                     let total;
