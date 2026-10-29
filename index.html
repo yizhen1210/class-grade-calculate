@@ -900,7 +900,6 @@
                     ['mid', 'final'].forEach(pKey => {
                         const b = ensureDailyBucket(subKey, pKey);
                         b.homework.columns = DEFAULT_CORE_HW_COLUMNS.map(c => ({ ...c }));
-                        b.homework.values = {};
                     });
                 });
                 if(isAdmin){
@@ -915,12 +914,65 @@
                     ['mid', 'final'].forEach(pKey => {
                         const b = ensureDailyBucket(subKey, pKey);
                         b.perform.columns = DEFAULT_CORE_PF_COLUMNS.map(c => ({ ...c }));
-                        b.perform.values = {};
                     });
                 });
                 if(isAdmin){
                     lastData._corePfStepV1 = true;
                     saveData({ scores: { daily: lastData.scores.daily }, _corePfStepV1: true });
+                }
+            }
+
+            /* 嘗試從舊欄位或封存快照自動救援上課表現加分資料 */
+            if(lastData._recoverPfBonusV1 !== true){
+                let recoveredAny = false;
+                const archives = Array.isArray(lastData.archives) ? lastData.archives : [];
+                CORE_SUBJECTS.forEach(subKey => {
+                    ['mid', 'final'].forEach(pKey => {
+                        const b = ensureDailyBucket(subKey, pKey);
+                        const vals = b.perform.values || {};
+                        // 1. 檢查 values 中是否有舊欄位 ID 的分數
+                        Object.keys(vals).forEach(sid => {
+                            const rec = vals[sid];
+                            if(!rec || typeof rec !== 'object') return;
+                            Object.keys(rec).forEach(cid => {
+                                if(cid !== 'pf_bonus' && cid !== 'pf_deduct' && rec[cid] !== null && rec[cid] !== undefined && rec[cid] !== ''){
+                                    const numVal = Number(rec[cid]);
+                                    if(!isNaN(numVal) && numVal > 0 && !rec.pf_bonus){
+                                        rec.pf_bonus = numVal >= 80 ? Math.max(0, numVal - 90) : numVal;
+                                        recoveredAny = true;
+                                    }
+                                }
+                            });
+                        });
+                        // 2. 若目前為空，檢查封存紀錄 (archives) 是否有上課表現分數
+                        if(Object.keys(vals).length === 0 && archives.length > 0){
+                            for(let i = archives.length - 1; i >= 0; i--){
+                                const snapDaily = archives[i] && archives[i].snapshot && archives[i].snapshot.scores && archives[i].snapshot.scores.daily;
+                                const snapPf = snapDaily && snapDaily[subKey] && snapDaily[subKey][pKey] && snapDaily[subKey][pKey].perform;
+                                if(snapPf && snapPf.values && Object.keys(snapPf.values).length > 0){
+                                    Object.keys(snapPf.values).forEach(sid => {
+                                        const oldRec = snapPf.values[sid];
+                                        if(!oldRec || typeof oldRec !== 'object') return;
+                                        const nums = Object.values(oldRec).filter(v => v !== null && v !== undefined && v !== '').map(Number).filter(n => !isNaN(n));
+                                        if(nums.length > 0){
+                                            const totalOld = nums.reduce((a, c) => a + c, 0);
+                                            const bonus = totalOld >= 80 ? Math.max(0, totalOld - 90) : totalOld;
+                                            if(bonus > 0){
+                                                if(!b.perform.values[sid]) b.perform.values[sid] = {};
+                                                b.perform.values[sid].pf_bonus = bonus;
+                                                recoveredAny = true;
+                                            }
+                                        }
+                                    });
+                                    if(recoveredAny) break;
+                                }
+                            }
+                        }
+                    });
+                });
+                if(isAdmin){
+                    lastData._recoverPfBonusV1 = true;
+                    saveData({ scores: { daily: lastData.scores.daily }, _recoverPfBonusV1: true });
                 }
             }
             return lastData;
