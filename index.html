@@ -260,7 +260,20 @@
         table.grid input[type=text]:focus { border-color: var(--accent); box-shadow: 0 0 8px 2px var(--focus-glow); outline: none; }
         table.grid th input[type=text] { display: inline-block; margin: 0; text-align: center; }
         .col-name-wrap { position: relative; display: inline-block; }
-        td.derived { font-weight: bold; color: var(--accent-dark); }
+        td.derived { font-weight: bold; color: var(--accent-dark); font-variant-numeric: tabular-nums; }
+        table.grid th.avg-col,
+        table.grid td.avg-col {
+            width: 100px;
+            min-width: 100px;
+            max-width: 100px;
+            box-sizing: border-box;
+        }
+        .avg-val-box {
+            display: inline-block;
+            width: 56px;
+            text-align: center;
+            font-variant-numeric: tabular-nums;
+        }
         td.rank-cell { font-weight: bold; }
         .col-del-btn { border: none; background: var(--surface); color: var(--danger); cursor: pointer; font-size: 0.75em; border-radius: 50%; width: 18px; height: 18px; transition: background 0.15s; position: absolute; top: -3px; right: -3px; line-height: 1; padding: 0; box-shadow: 0 0 0 1px var(--line); }
         .col-del-btn:hover { background: var(--danger); color: #fff; box-shadow: 0 0 0 1px var(--danger); }
@@ -320,11 +333,12 @@
             transform: none !important;
         }
         .deduct-val {
-            min-width: 32px;
+            min-width: 36px;
             text-align: center;
             font-weight: bold;
             font-size: 0.98em;
             color: var(--muted);
+            font-variant-numeric: tabular-nums;
         }
         .deduct-val.has-deduct {
             color: var(--danger);
@@ -1335,7 +1349,7 @@
                             <tr>
                                 <th class="name-col">姓名</th>
                                 ${catBucket.columns.map(c => `<th><span class="col-name-wrap"><input type="text" data-col="${c.id}" value="${escapeHtml(c.name)}" style="width:${colBoxWidth(c.name)}px"><button class="col-del-btn" data-col="${c.id}" title="刪除此欄">✕</button></span></th>`).join('')}
-                                <th>${resultHeaderLabel}</th>
+                                <th class="avg-col">${resultHeaderLabel}</th>
                                 ${isQuiz ? `<th>加點</th>` : ''}
                             </tr>
                         </thead>
@@ -1374,7 +1388,7 @@
                 const pulledOut = isStudentPulledOut(s, dailySubjectKey);
                 const tr = document.createElement('tr');
                 if(pulledOut){
-                    tr.innerHTML = `<td class="name-cell">${escapeHtml(s.name)}</td>${catBucket.columns.map(() => `<td>－</td>`).join('')}<td class="derived">抽離</td>${isQuiz ? `<td>－</td>` : ''}`;
+                    tr.innerHTML = `<td class="name-cell">${escapeHtml(s.name)}</td>${catBucket.columns.map(() => `<td>－</td>`).join('')}<td class="derived avg-col"><span class="avg-val-box">抽離</span></td>${isQuiz ? `<td>－</td>` : ''}`;
                     body.appendChild(tr);
                     return;
                 }
@@ -1459,7 +1473,7 @@
                     pointCellHtml = `<td class="point-cell" data-f="points">${text}</td>`;
                 }
 
-                tr.innerHTML = `<td class="name-cell">${escapeHtml(s.name)}</td>${colsHtml}<td class="derived" data-f="avg">${avg !== null ? fmt(avg) : '-'}</td>${pointCellHtml}`;
+                tr.innerHTML = `<td class="name-cell">${escapeHtml(s.name)}</td>${colsHtml}<td class="derived avg-col"><span class="avg-val-box" data-f="avg">${avg !== null ? fmt(avg) : '-'}</span></td>${pointCellHtml}`;
 
                 if(isCoreHw){
                     catBucket.columns.forEach(c => {
