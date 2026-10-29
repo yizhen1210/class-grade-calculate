@@ -321,6 +321,23 @@
             color: var(--danger);
         }
 
+        /* 全班平均與組距統計列 */
+        table.grid tfoot tr.stats-avg-row td {
+            border-top: 2px solid var(--accent);
+            background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+            font-weight: bold;
+            color: var(--text);
+        }
+        table.grid tfoot tr.stats-bracket-row td {
+            background: color-mix(in srgb, var(--bg) 40%, var(--surface));
+            font-size: 0.92em;
+            color: var(--text);
+        }
+        table.grid tfoot tr.stats-bracket-row td.bracket-label {
+            color: var(--muted);
+            font-weight: 500;
+        }
+
         .section-title { font-size: 1.15em; margin: 26px 0 10px; padding-bottom: 6px; border-bottom: 2px solid var(--line); }
         .section-title:first-child { margin-top: 0; }
 
@@ -726,6 +743,32 @@
         function rankOf(value, allValues){ return 1 + allValues.filter(v => v > value).length; }
         function newId(prefix){ return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
+        const SCORE_BRACKETS = [
+            { label: '100',   match: v => v >= 100 },
+            { label: '99~90', match: v => v >= 90 && v < 100 },
+            { label: '89~80', match: v => v >= 80 && v < 90 },
+            { label: '79~70', match: v => v >= 70 && v < 80 },
+            { label: '69~60', match: v => v >= 60 && v < 70 },
+            { label: '60以下', match: v => v < 60 }
+        ];
+        function calcColumnStats(vals){
+            const valid = vals.filter(v => v !== null && v !== undefined && v !== '' && !isNaN(Number(v))).map(Number);
+            if(!valid.length){
+                return { avg: '-', counts: SCORE_BRACKETS.map(() => '-') };
+            }
+            const avg = fmt(valid.reduce((a, b) => a + b, 0) / valid.length);
+            const counts = SCORE_BRACKETS.map(b => `${valid.filter(b.match).length}人`);
+            return { avg, counts };
+        }
+        function buildStatsTfootHtml(colStatsList, trailingEmptyCols = 0){
+            const emptyCells = Array(trailingEmptyCols).fill('<td>－</td>').join('');
+            const avgRow = `<tr class="stats-avg-row"><td class="name-cell">全班平均</td>${colStatsList.map(st => `<td class="derived">${st.avg}</td>`).join('')}${emptyCells}</tr>`;
+            const bracketRows = SCORE_BRACKETS.map((b, idx) =>
+                `<tr class="stats-bracket-row"><td class="name-cell bracket-label">${b.label}</td>${colStatsList.map(st => `<td>${st.counts[idx]}</td>`).join('')}${emptyCells}</tr>`
+            ).join('');
+            return avgRow + bracketRows;
+        }
+
         /* ---------- 加點計算規則函數 ---------- */
         // 平考：若項目名稱是聽寫，只有100可以加，一次加50點；若項目名稱有卷，只有100可以加，一次加100點
         function getQuizItemRulePoints(colName, scoreVal){
@@ -1042,6 +1085,7 @@
                             </tr>
                         </thead>
                         <tbody id="catBody"></tbody>
+                        ${isQuiz ? `<tfoot id="catFoot"></tfoot>` : ''}
                     </table>
                 </div>
                 ${isQuiz ? `
@@ -1191,6 +1235,14 @@
             });
 
             if(isQuiz){
+                const activeStudents = data.students.filter(s => !isStudentPulledOut(s, dailySubjectKey));
+                const colStatsList = catBucket.columns.map(c =>
+                    calcColumnStats(activeStudents.map(s => getLeaf(catBucket.values[s.id], c.id)))
+                );
+                const avgColStats = calcColumnStats(activeStudents.map(s => categoryAverage(catBucket, s.id, false)));
+                const foot = area.querySelector('#catFoot');
+                if(foot) foot.innerHTML = buildStatsTfootHtml([...colStatsList, avgColStats], 1);
+
                 const sel = area.querySelector('#quizPointStudentSel');
                 const btn = area.querySelector('#quizCalcPointBtn');
                 btn.onclick = async () => {
@@ -1346,6 +1398,7 @@
                             </tr>
                         </thead>
                         <tbody id="examBody"></tbody>
+                        <tfoot id="examFoot"></tfoot>
                     </table>
                 </div>
 
@@ -1432,12 +1485,21 @@
                     };
                     inp.oninput = recalcRow;
                     inp.onchange = e => {
-                        saveLeaf(['scores', bucketKey, s.id, sub], num(e.target.value));
+                        const v = e.target.value;
+                        saveLeaf(['scores', bucketKey, s.id, sub], v === '' ? null : num(v));
                         renderExamPanel(el);
                     };
                 });
                 body.appendChild(tr);
             });
+
+            const examFoot = el.querySelector('#examFoot');
+            if(examFoot){
+                const subjectStatsList = EXAM_SUBJECTS.map(sub =>
+                    calcColumnStats(data.students.map(s => getLeaf(bucket[s.id], sub)))
+                );
+                examFoot.innerHTML = buildStatsTfootHtml(subjectStatsList, 3);
+            }
 
             const sel = el.querySelector('#examPointStudentSel');
             const btn = el.querySelector('#examCalcPointBtn');
