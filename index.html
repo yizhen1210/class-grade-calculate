@@ -264,6 +264,63 @@
         .col-del-btn { border: none; background: var(--surface); color: var(--danger); cursor: pointer; font-size: 0.75em; border-radius: 50%; width: 18px; height: 18px; transition: background 0.15s; position: absolute; top: -3px; right: -3px; line-height: 1; padding: 0; box-shadow: 0 0 0 1px var(--line); }
         .col-del-btn:hover { background: var(--danger); color: #fff; box-shadow: 0 0 0 1px var(--danger); }
 
+        /* 作業扣分按鈕組 */
+        .deduct-stepper {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            background: color-mix(in srgb, var(--bg) 45%, var(--surface));
+            border: 2px solid var(--line);
+            border-radius: 50px;
+            padding: 3px 6px;
+        }
+        .deduct-btn {
+            border: 1.5px solid var(--accent);
+            background: var(--surface);
+            color: var(--accent-dark);
+            border-radius: 50px;
+            padding: 3px 10px;
+            font-family: inherit;
+            font-size: 0.88em;
+            font-weight: bold;
+            cursor: pointer;
+            line-height: 1.2;
+            transition: background 0.15s, color 0.15s, border-color 0.15s, opacity 0.15s;
+        }
+        .deduct-btn.minus {
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+        .deduct-btn.minus:hover {
+            background: var(--danger);
+            color: #fff;
+        }
+        .deduct-btn.plus {
+            border-color: var(--line);
+            color: var(--muted);
+        }
+        .deduct-btn.plus:not(:disabled):hover {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #fff;
+        }
+        .deduct-btn:disabled {
+            opacity: 0.35;
+            cursor: default;
+            transform: none !important;
+        }
+        .deduct-val {
+            min-width: 32px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 0.98em;
+            color: var(--muted);
+        }
+        .deduct-val.has-deduct {
+            color: var(--danger);
+        }
+
         .section-title { font-size: 1.15em; margin: 26px 0 10px; padding-bottom: 6px; border-bottom: 2px solid var(--line); }
         .section-title:first-child { margin-top: 0; }
 
@@ -706,12 +763,17 @@
         }
 
         const DEFAULT_CORE_HW_COLUMNS = [
-            { id: 'hw_ugly', name: '字醜' },
-            { id: 'hw_late', name: '遲交' },
-            { id: 'hw_missing', name: '缺交' }
+            { id: 'hw_ugly', name: '字醜', step: 1 },
+            { id: 'hw_late', name: '遲交', step: 1 },
+            { id: 'hw_missing', name: '缺交', step: 2 }
         ];
         function isCoreHomework(subjectKey, cat){
             return CORE_SUBJECTS.includes(subjectKey) && cat === 'homework';
+        }
+        function hwDeductStep(col){
+            if(col && col.step) return Number(col.step);
+            if(col && (col.id === 'hw_missing' || (col.name && col.name.includes('缺交')))) return 2;
+            return 1;
         }
         function emptyCategoryBucket(){ return { columns: [], values: {} }; }
         function ensureDailyBucket(subjectKey, periodKey){
@@ -962,7 +1024,7 @@
 
             let hintMessage = '每一欄可自訂名稱（例如「第1次習作」），成績以 0–100 分登記；學生的「平均」為該生已填欄位的平均分數。';
             if(isCoreHw){
-                hintMessage = '作業成績固定起始分數為 100 分，旁邊各別欄位（字醜、遲交、缺交等）皆為扣分；作業成績 ＝ 100 － 各欄扣分總和。';
+                hintMessage = '作業成績固定起始分數為 100 分；點擊按鈕即可直接扣分（字醜、遲交一次扣 1 分，缺交一次扣 2 分；按「+」可加回誤扣分數）。';
             } else if(isQuiz){
                 hintMessage = '平考加點規則：項目名稱含「聽寫」滿100分加50點；項目名稱含「卷」滿100分加100點。已加點會標示標籤。';
             }
@@ -1025,6 +1087,17 @@
 
                 const colsHtml = catBucket.columns.map(c => {
                     const val = getLeaf(catBucket.values[s.id], c.id);
+                    if(isCoreHw){
+                        const step = hwDeductStep(c);
+                        const curDeduct = val !== null ? Math.abs(val) : 0;
+                        return `<td>
+                            <div class="deduct-stepper">
+                                <button type="button" class="deduct-btn minus" data-act="deduct" data-col="${c.id}">-${step}</button>
+                                <span class="deduct-val ${curDeduct > 0 ? 'has-deduct' : ''}" data-val="${c.id}">${curDeduct > 0 ? '-' + fmt(curDeduct) : '0'}</span>
+                                <button type="button" class="deduct-btn plus" data-act="restore" data-col="${c.id}" ${curDeduct <= 0 ? 'disabled' : ''}>+${step}</button>
+                            </div>
+                        </td>`;
+                    }
                     let badgeHtml = '';
                     if(isQuiz){
                         const rulePts = getQuizItemRulePoints(c.name, val);
@@ -1055,25 +1128,46 @@
 
                 tr.innerHTML = `<td class="name-cell">${escapeHtml(s.name)}</td>${colsHtml}<td class="derived" data-f="avg">${avg !== null ? fmt(avg) : '-'}</td>${pointCellHtml}`;
 
-                catBucket.columns.forEach(c => {
-                    const inp = tr.querySelector(`input[data-col="${c.id}"]`);
-                    inp.oninput = () => {
-                        const vals = catBucket.columns.map(cc => { const v = tr.querySelector(`input[data-col="${cc.id}"]`).value; return v === '' ? null : num(v); }).filter(v => v !== null);
-                        if(isCoreHw){
-                            const deduct = vals.reduce((a, b) => a + Math.abs(b), 0);
-                            tr.querySelector('[data-f=avg]').textContent = fmt(Math.max(0, 100 - deduct));
-                        } else {
+                if(isCoreHw){
+                    catBucket.columns.forEach(c => {
+                        const step = hwDeductStep(c);
+                        const deductBtn = tr.querySelector(`button[data-act="deduct"][data-col="${c.id}"]`);
+                        const restoreBtn = tr.querySelector(`button[data-act="restore"][data-col="${c.id}"]`);
+                        const valSpan = tr.querySelector(`span[data-val="${c.id}"]`);
+
+                        const applyDelta = (delta) => {
+                            if(!catBucket.values[s.id]) catBucket.values[s.id] = {};
+                            const prev = getLeaf(catBucket.values[s.id], c.id);
+                            const cur = prev !== null ? Math.abs(prev) : 0;
+                            const next = Math.max(0, Math.min(100, cur + delta));
+                            catBucket.values[s.id][c.id] = next === 0 ? null : next;
+                            valSpan.textContent = next > 0 ? '-' + fmt(next) : '0';
+                            valSpan.classList.toggle('has-deduct', next > 0);
+                            restoreBtn.disabled = next <= 0;
+                            const newScore = categoryAverage(catBucket, s.id, true);
+                            tr.querySelector('[data-f=avg]').textContent = fmt(newScore);
+                            saveLeaf(['scores', 'daily', dailySubjectKey, dailyPeriod, cat, 'values', s.id], catBucket.values[s.id]);
+                        };
+
+                        deductBtn.onclick = () => applyDelta(step);
+                        restoreBtn.onclick = () => applyDelta(-step);
+                    });
+                } else {
+                    catBucket.columns.forEach(c => {
+                        const inp = tr.querySelector(`input[data-col="${c.id}"]`);
+                        inp.oninput = () => {
+                            const vals = catBucket.columns.map(cc => { const v = tr.querySelector(`input[data-col="${cc.id}"]`).value; return v === '' ? null : num(v); }).filter(v => v !== null);
                             tr.querySelector('[data-f=avg]').textContent = vals.length ? fmt(vals.reduce((a,b)=>a+b,0)/vals.length) : '-';
-                        }
-                    };
-                    inp.onchange = e => {
-                        const v = e.target.value;
-                        if(!catBucket.values[s.id]) catBucket.values[s.id] = {};
-                        catBucket.values[s.id][c.id] = v === '' ? null : num(v);
-                        saveLeaf(['scores', 'daily', dailySubjectKey, dailyPeriod, cat, 'values', s.id], catBucket.values[s.id]);
-                        renderDailyCategorySub(area, data, bucket, cat);
-                    };
-                });
+                        };
+                        inp.onchange = e => {
+                            const v = e.target.value;
+                            if(!catBucket.values[s.id]) catBucket.values[s.id] = {};
+                            catBucket.values[s.id][c.id] = v === '' ? null : num(v);
+                            saveLeaf(['scores', 'daily', dailySubjectKey, dailyPeriod, cat, 'values', s.id], catBucket.values[s.id]);
+                            renderDailyCategorySub(area, data, bucket, cat);
+                        };
+                    });
+                }
                 body.appendChild(tr);
             });
 
