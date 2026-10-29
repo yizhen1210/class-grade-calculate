@@ -705,6 +705,14 @@
             return { homework: (Number(w.homework) || 0) / 100, quiz: 0, perform: (Number(w.perform) || 0) / 100 };
         }
 
+        const DEFAULT_CORE_HW_COLUMNS = [
+            { id: 'hw_ugly', name: '字醜' },
+            { id: 'hw_late', name: '遲交' },
+            { id: 'hw_missing', name: '缺交' }
+        ];
+        function isCoreHomework(subjectKey, cat){
+            return CORE_SUBJECTS.includes(subjectKey) && cat === 'homework';
+        }
         function emptyCategoryBucket(){ return { columns: [], values: {} }; }
         function ensureDailyBucket(subjectKey, periodKey){
             const sc = lastData.scores;
@@ -712,6 +720,9 @@
             if(!sc.daily[subjectKey][periodKey]) sc.daily[subjectKey][periodKey] = {};
             const b = sc.daily[subjectKey][periodKey];
             CATEGORY_KEYS.forEach(cat => { if(!b[cat]) b[cat] = emptyCategoryBucket(); if(!b[cat].columns) b[cat].columns = []; if(!b[cat].values) b[cat].values = {}; });
+            if(CORE_SUBJECTS.includes(subjectKey) && b.homework.columns.length === 0){
+                b.homework.columns = DEFAULT_CORE_HW_COLUMNS.map(c => ({ ...c }));
+            }
             if(!b.manualDaily) b.manualDaily = {}; 
             return b;
         }
@@ -748,27 +759,51 @@
                 if(sub.periodMode === 'split'){ ensureDailyBucket(sub.key, 'mid'); ensureDailyBucket(sub.key, 'final'); }
                 else { ensureDailyBucket(sub.key, 'single'); }
             });
+
+            /* 國語、數學期中及期末作業預設欄位：字醜、遲交、缺交（扣分制，起始100分） */
+            if(lastData._coreHwDeductV1 !== true){
+                CORE_SUBJECTS.forEach(subKey => {
+                    ['mid', 'final'].forEach(pKey => {
+                        const b = ensureDailyBucket(subKey, pKey);
+                        b.homework.columns = DEFAULT_CORE_HW_COLUMNS.map(c => ({ ...c }));
+                        b.homework.values = {};
+                    });
+                });
+                if(isAdmin){
+                    lastData._coreHwDeductV1 = true;
+                    saveData({ scores: { daily: lastData.scores.daily }, _coreHwDeductV1: true });
+                }
+            }
             return lastData;
         }
 
         function saveLeaf(path, value){ const o = {}; deepSet(o, path, value); saveData(o); deepSet(lastData, path, value); }
 
-        function categoryAverage(bucket, sid){
+        function categoryAverage(bucket, sid, isDeduction = false){
+            if(isDeduction){
+                if(!bucket || !bucket.columns) return 100;
+                const deduct = bucket.columns
+                    .map(c => getLeaf(bucket.values && bucket.values[sid], c.id))
+                    .filter(v => v !== null)
+                    .reduce((a, b) => a + Math.abs(b), 0);
+                return Math.max(0, 100 - deduct);
+            }
             if(!bucket || !bucket.columns.length) return null;
             const vals = bucket.columns.map(c => getLeaf(bucket.values[sid], c.id)).filter(v => v !== null);
             if(!vals.length) return null;
             return vals.reduce((a, b) => a + b, 0) / vals.length;
         }
-        function dailyScore100FromBucket(bucket, sid, weights){
+        function dailyScore100FromBucket(bucket, sid, weights, isCore = undefined){
             const w = weights || { homework: 0.4, quiz: 0.4, perform: 0.2 };
-            const hw = categoryAverage(bucket.homework, sid);
-            const qz = categoryAverage(bucket.quiz, sid);
-            const pf = categoryAverage(bucket.perform, sid);
+            const useDeductHw = isCore !== undefined ? isCore : (w.quiz > 0);
+            const hw = categoryAverage(bucket.homework, sid, useDeductHw);
+            const qz = categoryAverage(bucket.quiz, sid, false);
+            const pf = categoryAverage(bucket.perform, sid, false);
             return (hw || 0) * w.homework + (qz || 0) * w.quiz + (pf || 0) * w.perform;
         }
         function effectiveDaily100(bucket, sid, weights, pulledOut){
             if(pulledOut) return getLeaf(bucket.manualDaily, sid) || 0;
-            return dailyScore100FromBucket(bucket, sid, weights);
+            return dailyScore100FromBucket(bucket, sid, weights, true);
         }
 
         function renderPublic(data, status){
@@ -884,14 +919,18 @@
                 renderDailySummarySub(area, data, bucket, sub);
                 return;
             }
+            const isCoreHw = isCoreHomework(dailySubjectKey, dailyCategoryTab);
             addBtn.classList.remove('hidden');
-            addBtn.textContent = `＋ 新增${CATEGORY_LABEL[dailyCategoryTab]}項目`;
+            addBtn.textContent = isCoreHw ? `＋ 新增作業扣分項目` : `＋ 新增${CATEGORY_LABEL[dailyCategoryTab]}項目`;
             addBtn.onclick = () => addDailyColumn(area, bucket, dailyCategoryTab, sub);
             clearBtn.classList.remove('hidden');
-            clearBtn.textContent = `清空${CATEGORY_LABEL[dailyCategoryTab]}分數`;
+            clearBtn.textContent = isCoreHw ? `清空作業扣分` : `清空${CATEGORY_LABEL[dailyCategoryTab]}分數`;
             clearBtn.onclick = async () => {
                 const catBucket = bucket[dailyCategoryTab];
-                const ok = await askConfirm(`確定清空「${CATEGORY_LABEL[dailyCategoryTab]}」目前所有學生的分數？項目欄位會保留，此動作無法復原。`);
+                const confirmMsg = isCoreHw
+                    ? `確定清空「作業」目前所有學生的扣分紀錄？清空後起始分數將恢復為 100 分，項目欄位會保留，此動作無法復原。`
+                    : `確定清空「${CATEGORY_LABEL[dailyCategoryTab]}」目前所有學生的分數？項目欄位會保留，此動作無法復原。`;
+                const ok = await askConfirm(confirmMsg);
                 if(ok){
                     catBucket.values = {};
                     saveLeaf(['scores', 'daily', dailySubjectKey, dailyPeriod, dailyCategoryTab, 'values'], {});
@@ -903,7 +942,10 @@
 
         async function addDailyColumn(area, bucket, cat, sub){
             const catBucket = bucket[cat];
-            const name = await askInput(`請輸入${CATEGORY_LABEL[cat]}項目名稱`, `${CATEGORY_LABEL[cat]}${catBucket.columns.length + 1}`);
+            const isCoreHw = isCoreHomework(dailySubjectKey, cat);
+            const promptLabel = isCoreHw ? '請輸入作業扣分項目名稱' : `請輸入${CATEGORY_LABEL[cat]}項目名稱`;
+            const defaultName = isCoreHw ? `扣分項目${catBucket.columns.length + 1}` : `${CATEGORY_LABEL[cat]}${catBucket.columns.length + 1}`;
+            const name = await askInput(promptLabel, defaultName);
             if(name && name.trim()){
                 catBucket.columns.push({ id: newId('c'), name: name.trim() });
                 saveLeaf(['scores', 'daily', dailySubjectKey, dailyPeriod, cat, 'columns'], catBucket.columns);
@@ -916,9 +958,12 @@
         function renderDailyCategorySub(area, data, bucket, cat){
             const catBucket = bucket[cat];
             const isQuiz = (cat === 'quiz');
+            const isCoreHw = isCoreHomework(dailySubjectKey, cat);
 
             let hintMessage = '每一欄可自訂名稱（例如「第1次習作」），成績以 0–100 分登記；學生的「平均」為該生已填欄位的平均分數。';
-            if(isQuiz){
+            if(isCoreHw){
+                hintMessage = '作業成績固定起始分數為 100 分，旁邊各別欄位（字醜、遲交、缺交等）皆為扣分；作業成績 ＝ 100 － 各欄扣分總和。';
+            } else if(isQuiz){
                 hintMessage = '平考加點規則：項目名稱含「聽寫」滿100分加50點；項目名稱含「卷」滿100分加100點。已加點會標示標籤。';
             }
 
@@ -930,7 +975,7 @@
                             <tr>
                                 <th>姓名</th>
                                 ${catBucket.columns.map(c => `<th><span class="col-name-wrap"><input type="text" data-col="${c.id}" value="${escapeHtml(c.name)}" style="width:${colBoxWidth(c.name)}px"><button class="col-del-btn" data-col="${c.id}" title="刪除此欄">✕</button></span></th>`).join('')}
-                                <th>平均</th>
+                                <th>${isCoreHw ? '作業成績' : '平均'}</th>
                                 ${isQuiz ? `<th>加點</th>` : ''}
                             </tr>
                         </thead>
@@ -972,7 +1017,7 @@
                     body.appendChild(tr);
                     return;
                 }
-                const avg = categoryAverage(catBucket, s.id);
+                const avg = categoryAverage(catBucket, s.id, isCoreHw);
 
                 // 計算可加點數與已加點數
                 let pendingPts = 0;
@@ -1014,7 +1059,12 @@
                     const inp = tr.querySelector(`input[data-col="${c.id}"]`);
                     inp.oninput = () => {
                         const vals = catBucket.columns.map(cc => { const v = tr.querySelector(`input[data-col="${cc.id}"]`).value; return v === '' ? null : num(v); }).filter(v => v !== null);
-                        tr.querySelector('[data-f=avg]').textContent = vals.length ? fmt(vals.reduce((a,b)=>a+b,0)/vals.length) : '-';
+                        if(isCoreHw){
+                            const deduct = vals.reduce((a, b) => a + Math.abs(b), 0);
+                            tr.querySelector('[data-f=avg]').textContent = fmt(Math.max(0, 100 - deduct));
+                        } else {
+                            tr.querySelector('[data-f=avg]').textContent = vals.length ? fmt(vals.reduce((a,b)=>a+b,0)/vals.length) : '-';
+                        }
                     };
                     inp.onchange = e => {
                         const v = e.target.value;
@@ -1137,24 +1187,24 @@
                 </div>
             `;
             const formulaText = sub.hasExam
-                ? '平時分數 ＝ 作業平均×0.4 ＋ 平考平均×0.4 ＋ 上課表現平均×0.2（抽離學生改為手動輸入）'
+                ? '平時分數 ＝ 作業成績×0.4 ＋ 平考平均×0.4 ＋ 上課表現平均×0.2（抽離學生改為手動輸入）'
                 : `平時分數 ＝ 作業平均×${fmt(weights.homework)} ＋ 上課表現平均×${fmt(weights.perform)}`;
             area.innerHTML = `
                 ${weightEditor}
                 <p class="hint-text">${formulaText}</p>
                 <div class="table-wrap">
                     <table class="grid">
-                        <thead><tr><th>姓名</th><th>作業平均</th>${sub.hasExam ? '<th>平考平均</th>' : ''}<th>表現平均</th><th>平時分數</th></tr></thead>
+                        <thead><tr><th>姓名</th><th>${sub.hasExam ? '作業成績' : '作業平均'}</th>${sub.hasExam ? '<th>平考平均</th>' : ''}<th>表現平均</th><th>平時分數</th></tr></thead>
                         <tbody>${data.students.map(s => {
                             const pulledOut = isStudentPulledOut(s, sub.key);
                             if(pulledOut){
                                 const manualVal = getLeaf(bucket.manualDaily, s.id);
                                 return `<tr><td class="name-cell">${escapeHtml(s.name)}</td><td>－</td>${sub.hasExam ? '<td>－</td>' : ''}<td>－</td><td><input type="number" class="manual-daily-input" data-sid="${s.id}" min="0" max="100" step="0.5" value="${manualVal ?? ''}"></td></tr>`;
                             }
-                            const hw = categoryAverage(bucket.homework, s.id);
-                            const qz = categoryAverage(bucket.quiz, s.id);
-                            const pf = categoryAverage(bucket.perform, s.id);
-                            const total = dailyScore100FromBucket(bucket, s.id, weights);
+                            const hw = categoryAverage(bucket.homework, s.id, sub.hasExam);
+                            const qz = categoryAverage(bucket.quiz, s.id, false);
+                            const pf = categoryAverage(bucket.perform, s.id, false);
+                            const total = dailyScore100FromBucket(bucket, s.id, weights, sub.hasExam);
                             return `<tr><td class="name-cell">${escapeHtml(s.name)}</td><td>${hw !== null ? fmt(hw) : '-'}</td>${sub.hasExam ? `<td>${qz !== null ? fmt(qz) : '-'}</td>` : ''}<td>${pf !== null ? fmt(pf) : '-'}</td><td class="derived">${fmt(total)}</td></tr>`;
                         }).join('')}</tbody>
                     </table>
