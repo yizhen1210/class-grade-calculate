@@ -1239,9 +1239,8 @@
                 const colStatsList = catBucket.columns.map(c =>
                     calcColumnStats(activeStudents.map(s => getLeaf(catBucket.values[s.id], c.id)))
                 );
-                const avgColStats = calcColumnStats(activeStudents.map(s => categoryAverage(catBucket, s.id, false)));
                 const foot = area.querySelector('#catFoot');
-                if(foot) foot.innerHTML = buildStatsTfootHtml([...colStatsList, avgColStats], 1);
+                if(foot) foot.innerHTML = buildStatsTfootHtml(colStatsList, 2);
 
                 const sel = area.querySelector('#quizPointStudentSel');
                 const btn = area.querySelector('#quizCalcPointBtn');
