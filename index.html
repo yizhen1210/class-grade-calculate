@@ -1173,7 +1173,67 @@
 
         function colBoxWidth(name){ return Math.max(70, name.length * 17 + 28); }
 
+        function captureActiveScoreInput(container, colAttr){
+            const active = document.activeElement;
+            if(active && container && container.contains(active) && active.dataset && active.dataset.sid && active.hasAttribute(colAttr)){
+                return { sid: active.dataset.sid, colVal: active.getAttribute(colAttr) };
+            }
+            return null;
+        }
+
+        function restoreActiveScoreInput(container, colAttr, saved){
+            if(!saved || !container) return;
+            const target = container.querySelector(`input[data-sid="${saved.sid}"][${colAttr}="${saved.colVal}"]`);
+            if(target){
+                target.focus();
+                target.select();
+            }
+        }
+
+        function bindVerticalTabNavigation(container, colAttr, colKeys){
+            if(!container) return;
+            container.querySelectorAll(`input[type=number][${colAttr}]`).forEach(inp => {
+                inp.addEventListener('keydown', e => {
+                    if(e.key !== 'Tab' || e.isComposing) return;
+                    const curCol = inp.getAttribute(colAttr);
+                    const sameColInputs = Array.from(container.querySelectorAll(`input[type=number][${colAttr}="${curCol}"]`));
+                    const idx = sameColInputs.indexOf(inp);
+                    if(idx === -1) return;
+
+                    let targetInp = null;
+                    if(!e.shiftKey){
+                        if(idx < sameColInputs.length - 1){
+                            targetInp = sameColInputs[idx + 1];
+                        } else if(Array.isArray(colKeys)){
+                            const colIdx = colKeys.indexOf(curCol);
+                            if(colIdx !== -1 && colIdx < colKeys.length - 1){
+                                const nextColInputs = container.querySelectorAll(`input[type=number][${colAttr}="${colKeys[colIdx + 1]}"]`);
+                                if(nextColInputs.length) targetInp = nextColInputs[0];
+                            }
+                        }
+                    } else {
+                        if(idx > 0){
+                            targetInp = sameColInputs[idx - 1];
+                        } else if(Array.isArray(colKeys)){
+                            const colIdx = colKeys.indexOf(curCol);
+                            if(colIdx > 0){
+                                const prevColInputs = container.querySelectorAll(`input[type=number][${colAttr}="${colKeys[colIdx - 1]}"]`);
+                                if(prevColInputs.length) targetInp = prevColInputs[prevColInputs.length - 1];
+                            }
+                        }
+                    }
+
+                    if(targetInp){
+                        e.preventDefault();
+                        targetInp.focus();
+                        targetInp.select();
+                    }
+                });
+            });
+        }
+
         function renderDailyCategorySub(area, data, bucket, cat){
+            const savedFocus = captureActiveScoreInput(area, 'data-col');
             const catBucket = bucket[cat];
             const isQuiz = (cat === 'quiz');
             const isCoreHw = isCoreHomework(dailySubjectKey, cat);
@@ -1296,7 +1356,7 @@
                             badgeHtml = `<br><span class="point-badge eligible">+${rulePts}點</span>`;
                         }
                     }
-                    return `<td><input type="number" min="0" max="100" step="0.5" data-col="${c.id}" style="width:${colBoxWidth(c.name)}px" value="${val ?? ''}">${badgeHtml}</td>`;
+                    return `<td><input type="number" min="0" max="100" step="0.5" data-sid="${s.id}" data-col="${c.id}" style="width:${colBoxWidth(c.name)}px" value="${val ?? ''}">${badgeHtml}</td>`;
                 }).join('');
 
                 let pointCellHtml = '';
@@ -1380,6 +1440,11 @@
                 }
                 body.appendChild(tr);
             });
+
+            if(!isCoreHw && !isCorePf){
+                bindVerticalTabNavigation(body, 'data-col', catBucket.columns.map(c => c.id));
+                restoreActiveScoreInput(body, 'data-col', savedFocus);
+            }
 
             area.querySelectorAll('.col-del-btn').forEach(btn => btn.onclick = async () => {
                 const ok = await askConfirm('確定刪除這一欄？');
@@ -1544,6 +1609,7 @@
         }
 
         function renderExamPanel(el){
+            const savedFocus = captureActiveScoreInput(el, 'data-sub');
             const data = state();
             el.innerHTML = `
                 <p class="hint-text">加權總分 ＝ 國語×5＋數學×4＋自然×3＋社會×3＋英文×2（用於班排名，比重沿用原始段考表）。段考加點規則：100分加500點、90分以上加300點、80分以上加100點。</p>
@@ -1623,7 +1689,7 @@
                         badgeHtml = `<br><span class="point-badge eligible">+${rulePts}點</span>`;
                     }
 
-                    return `<td><input type="number" min="0" max="100" step="0.5" data-sub="${sub}" value="${val ?? ''}">${badgeHtml}</td>`;
+                    return `<td><input type="number" min="0" max="100" step="0.5" data-sid="${s.id}" data-sub="${sub}" value="${val ?? ''}">${badgeHtml}</td>`;
                 }).join('');
 
                 let pointText = '-';
@@ -1657,6 +1723,9 @@
                 });
                 body.appendChild(tr);
             });
+
+            bindVerticalTabNavigation(body, 'data-sub', EXAM_SUBJECTS);
+            restoreActiveScoreInput(body, 'data-sub', savedFocus);
 
             const examFoot = el.querySelector('#examFoot');
             if(examFoot){
