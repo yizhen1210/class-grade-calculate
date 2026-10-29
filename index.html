@@ -297,6 +297,14 @@
             background: var(--danger);
             color: #fff;
         }
+        .deduct-btn.bonus-add {
+            border-color: #137333;
+            color: #137333;
+        }
+        .deduct-btn.bonus-add:hover {
+            background: #137333;
+            color: #fff;
+        }
         .deduct-btn.plus {
             border-color: var(--line);
             color: var(--muted);
@@ -320,6 +328,9 @@
         }
         .deduct-val.has-deduct {
             color: var(--danger);
+        }
+        .deduct-val.has-bonus {
+            color: #137333;
         }
 
         /* 全班平均與組距統計列 */
@@ -811,8 +822,20 @@
             { id: 'hw_late', name: '遲交', step: 1 },
             { id: 'hw_missing', name: '缺交', step: 2 }
         ];
+        const DEFAULT_CORE_PF_COLUMNS = [
+            { id: 'pf_bonus', name: '加分', mode: 'bonus', step: 1 },
+            { id: 'pf_deduct', name: '扣分', mode: 'deduct', step: 1 }
+        ];
         function isCoreHomework(subjectKey, cat){
             return CORE_SUBJECTS.includes(subjectKey) && cat === 'homework';
+        }
+        function isCorePerform(subjectKey, cat){
+            return CORE_SUBJECTS.includes(subjectKey) && cat === 'perform';
+        }
+        function isBonusPerformCol(col){
+            if(col && col.mode) return col.mode === 'bonus';
+            if(col && (col.id === 'pf_deduct' || (col.name && col.name.includes('扣')))) return false;
+            return true;
         }
         function hwDeductStep(col){
             if(col && col.step) return Number(col.step);
@@ -826,8 +849,13 @@
             if(!sc.daily[subjectKey][periodKey]) sc.daily[subjectKey][periodKey] = {};
             const b = sc.daily[subjectKey][periodKey];
             CATEGORY_KEYS.forEach(cat => { if(!b[cat]) b[cat] = emptyCategoryBucket(); if(!b[cat].columns) b[cat].columns = []; if(!b[cat].values) b[cat].values = {}; });
-            if(CORE_SUBJECTS.includes(subjectKey) && b.homework.columns.length === 0){
-                b.homework.columns = DEFAULT_CORE_HW_COLUMNS.map(c => ({ ...c }));
+            if(CORE_SUBJECTS.includes(subjectKey)){
+                if(b.homework.columns.length === 0){
+                    b.homework.columns = DEFAULT_CORE_HW_COLUMNS.map(c => ({ ...c }));
+                }
+                if(b.perform.columns.length === 0){
+                    b.perform.columns = DEFAULT_CORE_PF_COLUMNS.map(c => ({ ...c }));
+                }
             }
             if(!b.manualDaily) b.manualDaily = {}; 
             return b;
@@ -880,10 +908,38 @@
                     saveData({ scores: { daily: lastData.scores.daily }, _coreHwDeductV1: true });
                 }
             }
+
+            /* 國語、數學期中及期末上課表現預設欄位：加分、扣分（基本分90分，按鈕式增減） */
+            if(lastData._corePfStepV1 !== true){
+                CORE_SUBJECTS.forEach(subKey => {
+                    ['mid', 'final'].forEach(pKey => {
+                        const b = ensureDailyBucket(subKey, pKey);
+                        b.perform.columns = DEFAULT_CORE_PF_COLUMNS.map(c => ({ ...c }));
+                        b.perform.values = {};
+                    });
+                });
+                if(isAdmin){
+                    lastData._corePfStepV1 = true;
+                    saveData({ scores: { daily: lastData.scores.daily }, _corePfStepV1: true });
+                }
+            }
             return lastData;
         }
 
         function saveLeaf(path, value){ const o = {}; deepSet(o, path, value); saveData(o); deepSet(lastData, path, value); }
+
+        function corePerformScore(bucket, sid){
+            if(!bucket || !bucket.columns) return 90;
+            let delta = 0;
+            bucket.columns.forEach(c => {
+                const v = getLeaf(bucket.values && bucket.values[sid], c.id);
+                if(v !== null){
+                    const amt = Math.abs(v);
+                    delta += isBonusPerformCol(c) ? amt : -amt;
+                }
+            });
+            return Math.max(0, Math.min(100, 90 + delta));
+        }
 
         function categoryAverage(bucket, sid, isDeduction = false){
             if(isDeduction){
@@ -901,10 +957,10 @@
         }
         function dailyScore100FromBucket(bucket, sid, weights, isCore = undefined){
             const w = weights || { homework: 0.4, quiz: 0.4, perform: 0.2 };
-            const useDeductHw = isCore !== undefined ? isCore : (w.quiz > 0);
-            const hw = categoryAverage(bucket.homework, sid, useDeductHw);
+            const useCoreRule = isCore !== undefined ? isCore : (w.quiz > 0);
+            const hw = categoryAverage(bucket.homework, sid, useCoreRule);
             const qz = categoryAverage(bucket.quiz, sid, false);
-            const pf = categoryAverage(bucket.perform, sid, false);
+            const pf = useCoreRule ? corePerformScore(bucket.perform, sid) : categoryAverage(bucket.perform, sid, false);
             return (hw || 0) * w.homework + (qz || 0) * w.quiz + (pf || 0) * w.perform;
         }
         function effectiveDaily100(bucket, sid, weights, pulledOut){
@@ -1026,16 +1082,20 @@
                 return;
             }
             const isCoreHw = isCoreHomework(dailySubjectKey, dailyCategoryTab);
+            const isCorePf = isCorePerform(dailySubjectKey, dailyCategoryTab);
             addBtn.classList.remove('hidden');
             addBtn.textContent = isCoreHw ? `＋ 新增作業扣分項目` : `＋ 新增${CATEGORY_LABEL[dailyCategoryTab]}項目`;
             addBtn.onclick = () => addDailyColumn(area, bucket, dailyCategoryTab, sub);
             clearBtn.classList.remove('hidden');
-            clearBtn.textContent = isCoreHw ? `清空作業扣分` : `清空${CATEGORY_LABEL[dailyCategoryTab]}分數`;
+            clearBtn.textContent = isCoreHw ? `清空作業扣分` : (isCorePf ? `清空表現加扣分` : `清空${CATEGORY_LABEL[dailyCategoryTab]}分數`);
             clearBtn.onclick = async () => {
                 const catBucket = bucket[dailyCategoryTab];
-                const confirmMsg = isCoreHw
-                    ? `確定清空「作業」目前所有學生的扣分紀錄？清空後起始分數將恢復為 100 分，項目欄位會保留，此動作無法復原。`
-                    : `確定清空「${CATEGORY_LABEL[dailyCategoryTab]}」目前所有學生的分數？項目欄位會保留，此動作無法復原。`;
+                let confirmMsg = `確定清空「${CATEGORY_LABEL[dailyCategoryTab]}」目前所有學生的分數？項目欄位會保留，此動作無法復原。`;
+                if(isCoreHw){
+                    confirmMsg = `確定清空「作業」目前所有學生的扣分紀錄？清空後起始分數將恢復為 100 分，項目欄位會保留，此動作無法復原。`;
+                } else if(isCorePf){
+                    confirmMsg = `確定清空「上課表現」目前所有學生的加扣分紀錄？清空後基本分數將恢復為 90 分，項目欄位會保留，此動作無法復原。`;
+                }
                 const ok = await askConfirm(confirmMsg);
                 if(ok){
                     catBucket.values = {};
@@ -1065,13 +1125,18 @@
             const catBucket = bucket[cat];
             const isQuiz = (cat === 'quiz');
             const isCoreHw = isCoreHomework(dailySubjectKey, cat);
+            const isCorePf = isCorePerform(dailySubjectKey, cat);
 
             let hintMessage = '每一欄可自訂名稱（例如「第1次習作」），成績以 0–100 分登記；學生的「平均」為該生已填欄位的平均分數。';
             if(isCoreHw){
                 hintMessage = '作業成績固定起始分數為 100 分；點擊按鈕即可直接扣分（字醜、遲交一次扣 1 分，缺交一次扣 2 分；按「+」可加回誤扣分數）。';
+            } else if(isCorePf){
+                hintMessage = '上課表現基本分數固定為 90 分；點擊按鈕即可直接增減分數（表現成績 ＝ 90 ＋ 加分 － 扣分，最高 100 分、最低 0 分）。';
             } else if(isQuiz){
                 hintMessage = '平考加點規則：項目名稱含「聽寫」滿100分加50點；項目名稱含「卷」滿100分加100點。已加點會標示標籤。';
             }
+
+            const resultHeaderLabel = isCoreHw ? '作業成績' : (isCorePf ? '表現成績' : '平均');
 
             area.innerHTML = `
                 <p class="hint-text">${hintMessage}</p>
@@ -1081,7 +1146,7 @@
                             <tr>
                                 <th class="name-col">姓名</th>
                                 ${catBucket.columns.map(c => `<th><span class="col-name-wrap"><input type="text" data-col="${c.id}" value="${escapeHtml(c.name)}" style="width:${colBoxWidth(c.name)}px"><button class="col-del-btn" data-col="${c.id}" title="刪除此欄">✕</button></span></th>`).join('')}
-                                <th>${isCoreHw ? '作業成績' : '平均'}</th>
+                                <th>${resultHeaderLabel}</th>
                                 ${isQuiz ? `<th>加點</th>` : ''}
                             </tr>
                         </thead>
@@ -1124,7 +1189,7 @@
                     body.appendChild(tr);
                     return;
                 }
-                const avg = categoryAverage(catBucket, s.id, isCoreHw);
+                const avg = isCorePf ? corePerformScore(catBucket, s.id) : categoryAverage(catBucket, s.id, isCoreHw);
 
                 // 計算可加點數與已加點數
                 let pendingPts = 0;
@@ -1142,6 +1207,28 @@
                                 <button type="button" class="deduct-btn plus" data-act="restore" data-col="${c.id}" ${curDeduct <= 0 ? 'disabled' : ''}>+${step}</button>
                             </div>
                         </td>`;
+                    }
+                    if(isCorePf){
+                        const step = Number(c.step) || 1;
+                        const isBonus = isBonusPerformCol(c);
+                        const curAmt = val !== null ? Math.abs(val) : 0;
+                        if(isBonus){
+                            return `<td>
+                                <div class="deduct-stepper">
+                                    <button type="button" class="deduct-btn bonus-add" data-act="inc" data-col="${c.id}">+${step}</button>
+                                    <span class="deduct-val ${curAmt > 0 ? 'has-bonus' : ''}" data-val="${c.id}">${curAmt > 0 ? '+' + fmt(curAmt) : '0'}</span>
+                                    <button type="button" class="deduct-btn plus" data-act="dec" data-col="${c.id}" ${curAmt <= 0 ? 'disabled' : ''}>-${step}</button>
+                                </div>
+                            </td>`;
+                        } else {
+                            return `<td>
+                                <div class="deduct-stepper">
+                                    <button type="button" class="deduct-btn minus" data-act="inc" data-col="${c.id}">-${step}</button>
+                                    <span class="deduct-val ${curAmt > 0 ? 'has-deduct' : ''}" data-val="${c.id}">${curAmt > 0 ? '-' + fmt(curAmt) : '0'}</span>
+                                    <button type="button" class="deduct-btn plus" data-act="dec" data-col="${c.id}" ${curAmt <= 0 ? 'disabled' : ''}>+${step}</button>
+                                </div>
+                            </td>`;
+                        }
                     }
                     let badgeHtml = '';
                     if(isQuiz){
@@ -1196,6 +1283,32 @@
 
                         deductBtn.onclick = () => applyDelta(step);
                         restoreBtn.onclick = () => applyDelta(-step);
+                    });
+                } else if(isCorePf){
+                    catBucket.columns.forEach(c => {
+                        const step = Number(c.step) || 1;
+                        const isBonus = isBonusPerformCol(c);
+                        const incBtn = tr.querySelector(`button[data-act="inc"][data-col="${c.id}"]`);
+                        const decBtn = tr.querySelector(`button[data-act="dec"][data-col="${c.id}"]`);
+                        const valSpan = tr.querySelector(`span[data-val="${c.id}"]`);
+
+                        const applyDelta = (delta) => {
+                            if(!catBucket.values[s.id]) catBucket.values[s.id] = {};
+                            const prev = getLeaf(catBucket.values[s.id], c.id);
+                            const cur = prev !== null ? Math.abs(prev) : 0;
+                            const next = Math.max(0, Math.min(100, cur + delta));
+                            catBucket.values[s.id][c.id] = next === 0 ? null : next;
+                            const prefix = isBonus ? '+' : '-';
+                            valSpan.textContent = next > 0 ? prefix + fmt(next) : '0';
+                            valSpan.classList.toggle(isBonus ? 'has-bonus' : 'has-deduct', next > 0);
+                            decBtn.disabled = next <= 0;
+                            const newScore = corePerformScore(catBucket, s.id);
+                            tr.querySelector('[data-f=avg]').textContent = fmt(newScore);
+                            saveLeaf(['scores', 'daily', dailySubjectKey, dailyPeriod, cat, 'values', s.id], catBucket.values[s.id]);
+                        };
+
+                        incBtn.onclick = () => applyDelta(step);
+                        decBtn.onclick = () => applyDelta(-step);
                     });
                 } else {
                     catBucket.columns.forEach(c => {
@@ -1333,14 +1446,14 @@
                 </div>
             `;
             const formulaText = sub.hasExam
-                ? '平時分數 ＝ 作業成績×0.4 ＋ 平考平均×0.4 ＋ 上課表現平均×0.2（抽離學生改為手動輸入）'
+                ? '平時分數 ＝ 作業成績×0.4 ＋ 平考平均×0.4 ＋ 表現成績×0.2（抽離學生改為手動輸入）'
                 : `平時分數 ＝ 作業平均×${fmt(weights.homework)} ＋ 上課表現平均×${fmt(weights.perform)}`;
             area.innerHTML = `
                 ${weightEditor}
                 <p class="hint-text">${formulaText}</p>
                 <div class="table-wrap">
                     <table class="grid">
-                        <thead><tr><th class="name-col">姓名</th><th>${sub.hasExam ? '作業成績' : '作業平均'}</th>${sub.hasExam ? '<th>平考平均</th>' : ''}<th>表現平均</th><th>平時分數</th></tr></thead>
+                        <thead><tr><th class="name-col">姓名</th><th>${sub.hasExam ? '作業成績' : '作業平均'}</th>${sub.hasExam ? '<th>平考平均</th>' : ''}<th>${sub.hasExam ? '表現成績' : '表現平均'}</th><th>平時分數</th></tr></thead>
                         <tbody>${data.students.map(s => {
                             const pulledOut = isStudentPulledOut(s, sub.key);
                             if(pulledOut){
@@ -1349,7 +1462,7 @@
                             }
                             const hw = categoryAverage(bucket.homework, s.id, sub.hasExam);
                             const qz = categoryAverage(bucket.quiz, s.id, false);
-                            const pf = categoryAverage(bucket.perform, s.id, false);
+                            const pf = sub.hasExam ? corePerformScore(bucket.perform, s.id) : categoryAverage(bucket.perform, s.id, false);
                             const total = dailyScore100FromBucket(bucket, s.id, weights, sub.hasExam);
                             return `<tr><td class="name-cell">${escapeHtml(s.name)}</td><td>${hw !== null ? fmt(hw) : '-'}</td>${sub.hasExam ? `<td>${qz !== null ? fmt(qz) : '-'}</td>` : ''}<td>${pf !== null ? fmt(pf) : '-'}</td><td class="derived">${fmt(total)}</td></tr>`;
                         }).join('')}</tbody>
