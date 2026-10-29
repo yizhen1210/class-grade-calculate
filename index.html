@@ -840,37 +840,62 @@
             { id: 'pf_bonus', name: '加分', mode: 'bonus', step: 1 },
             { id: 'pf_deduct', name: '扣分', mode: 'deduct', step: 1 }
         ];
-        const DEFAULT_HEALTH_PF_COLUMNS = [
-            { id: 'hpf_life', name: '生活態度', step: 1 },
-            { id: 'hpf_class', name: '上課態度', step: 1 }
-        ];
+        const CUSTOM_PF_STEPPER_CONFIG = {
+            '健康': [
+                { id: 'hpf_life', name: '生活態度', step: 1 },
+                { id: 'hpf_class', name: '上課態度', step: 1 }
+            ],
+            '綜合': [
+                { id: 'cpf_class', name: '上課態度', step: 1 },
+                { id: 'cpf_clean', name: '日常(打掃)', step: 1 },
+                { id: 'cpf_service', name: '班級服務', step: 1 }
+            ],
+            '奔向衛武': [
+                { id: 'wpf_class', name: '上課態度', step: 1 }
+            ],
+            '智慧王': [
+                { id: 'zpf_class', name: '上課態度', step: 1 }
+            ],
+            '遇見書香': [
+                { id: 'spf_class', name: '上課態度', step: 1 }
+            ],
+            '表達力': [
+                { id: 'epf_class', name: '上課態度', step: 1 }
+            ]
+        };
         function isCoreHomework(subjectKey, cat){
             return CORE_SUBJECTS.includes(subjectKey) && cat === 'homework';
         }
         function isCorePerform(subjectKey, cat){
             return CORE_SUBJECTS.includes(subjectKey) && cat === 'perform';
         }
-        function isHealthSubject(subjectKey){
-            if(subjectKey === '健康') return true;
+        function getCustomPfStepperCols(subjectKey){
+            if(CUSTOM_PF_STEPPER_CONFIG[subjectKey]) return CUSTOM_PF_STEPPER_CONFIG[subjectKey];
             const custom = (lastData && lastData.subjects && Array.isArray(lastData.subjects.custom)) ? lastData.subjects.custom : [];
             const match = custom.find(c => c.id === subjectKey);
-            return !!(match && match.name && match.name.trim() === '健康');
+            const subName = match && match.name ? match.name.trim() : null;
+            return (subName && CUSTOM_PF_STEPPER_CONFIG[subName]) ? CUSTOM_PF_STEPPER_CONFIG[subName] : null;
+        }
+        function isHealthSubject(subjectKey){
+            return !!getCustomPfStepperCols(subjectKey);
         }
         function isHealthPerform(subjectKey, cat){
             return isHealthSubject(subjectKey) && cat === 'perform';
         }
-        function ensureHealthPerformColumns(perfBucket){
-            if(!perfBucket) return;
+        function normalizeColName(s){
+            return String(s || '').trim().replace(/（/g, '(').replace(/）/g, ')');
+        }
+        function ensureCustomPerformColumns(perfBucket, defaultCols){
+            if(!perfBucket || !Array.isArray(defaultCols)) return;
             if(!perfBucket.columns || perfBucket.columns.length === 0){
-                perfBucket.columns = DEFAULT_HEALTH_PF_COLUMNS.map(c => ({ ...c }));
+                perfBucket.columns = defaultCols.map(c => ({ ...c }));
                 return;
             }
-            const targetNames = ['生活態度', '上課態度'];
-            perfBucket.columns = targetNames.map((tName, idx) => {
-                const byName = perfBucket.columns.find(c => c.name && c.name.trim() === tName);
-                if(byName) return { ...byName, name: tName, step: Number(byName.step) || 1 };
-                if(perfBucket.columns[idx]) return { ...perfBucket.columns[idx], name: tName, step: Number(perfBucket.columns[idx].step) || 1 };
-                return { ...DEFAULT_HEALTH_PF_COLUMNS[idx] };
+            perfBucket.columns = defaultCols.map((tCol, idx) => {
+                const byName = perfBucket.columns.find(c => normalizeColName(c.name) === normalizeColName(tCol.name));
+                if(byName) return { ...byName, name: tCol.name, step: Number(byName.step) || 1 };
+                if(perfBucket.columns[idx]) return { ...perfBucket.columns[idx], name: tCol.name, step: Number(perfBucket.columns[idx].step) || 1 };
+                return { ...tCol };
             });
         }
         function isBonusPerformCol(col){
@@ -897,9 +922,10 @@
                 if(b.perform.columns.length === 0){
                     b.perform.columns = DEFAULT_CORE_PF_COLUMNS.map(c => ({ ...c }));
                 }
-            } else if(isHealthSubject(subjectKey)){
-                if(b.perform.columns.length === 0){
-                    b.perform.columns = DEFAULT_HEALTH_PF_COLUMNS.map(c => ({ ...c }));
+            } else {
+                const customPfCols = getCustomPfStepperCols(subjectKey);
+                if(customPfCols && b.perform.columns.length === 0){
+                    b.perform.columns = customPfCols.map(c => ({ ...c }));
                 }
             }
             if(!b.manualDaily) b.manualDaily = {}; 
@@ -1021,26 +1047,40 @@
                 }
             }
 
-            /* 健康上課表現預設欄位：生活態度、上課態度（起始90分，按鈕式加扣分） */
-            if(lastData._healthPfStepV1 !== true){
-                if(!lastData.subjects.custom.some(c => c.name && c.name.trim() === '健康')){
-                    lastData.subjects.custom.push({ id: 'subj_health', name: '健康', periodMode: 'single' });
-                }
-                lastData.subjects.custom.forEach(c => {
-                    if(c.name && c.name.trim() === '健康'){
-                        const periods = c.periodMode === 'split' ? ['mid', 'final'] : ['single'];
-                        periods.forEach(pKey => {
-                            const b = ensureDailyBucket(c.id, pKey);
-                            ensureHealthPerformColumns(b.perform);
+            /* 健康、綜合、奔向衛武、智慧王、遇見書香、表達力上課表現預設欄位（起始90分，按鈕式加扣分） */
+            if(lastData._customPfStepV2 !== true){
+                const defaultIdMap = {
+                    '健康': 'subj_health',
+                    '綜合': 'subj_integrated',
+                    '奔向衛武': 'subj_weiwu',
+                    '智慧王': 'subj_wisdom',
+                    '遇見書香': 'subj_reading',
+                    '表達力': 'subj_expression'
+                };
+                Object.entries(CUSTOM_PF_STEPPER_CONFIG).forEach(([subName, defaultCols]) => {
+                    if(!lastData.subjects.custom.some(c => c.name && c.name.trim() === subName)){
+                        lastData.subjects.custom.push({
+                            id: defaultIdMap[subName] || newId('subj'),
+                            name: subName,
+                            periodMode: 'single'
                         });
                     }
+                    lastData.subjects.custom.forEach(c => {
+                        if(c.name && c.name.trim() === subName){
+                            const periods = c.periodMode === 'split' ? ['mid', 'final'] : ['single'];
+                            periods.forEach(pKey => {
+                                const b = ensureDailyBucket(c.id, pKey);
+                                ensureCustomPerformColumns(b.perform, defaultCols);
+                            });
+                        }
+                    });
                 });
                 if(isAdmin){
-                    lastData._healthPfStepV1 = true;
+                    lastData._customPfStepV2 = true;
                     saveData({
                         subjects: { custom: lastData.subjects.custom },
                         scores: { daily: lastData.scores.daily },
-                        _healthPfStepV1: true
+                        _customPfStepV2: true
                     });
                 }
             }
@@ -1334,7 +1374,8 @@
             } else if(isCorePf){
                 hintMessage = '上課表現基本分數固定為 90 分；點擊按鈕即可直接增減分數（表現成績 ＝ 90 ＋ 加分 － 扣分，最高 100 分、最低 0 分）。';
             } else if(isHealthPf){
-                hintMessage = '健康上課表現預設為「生活態度」與「上課態度」，兩項起始成績皆為 90 分；點擊按鈕即可直接加分（+1）或扣分（-1），平均為各項成績之平均。';
+                const colNamesText = catBucket.columns.map(c => `「${c.name}」`).join('、');
+                hintMessage = `上課表現項目（${colNamesText}）起始成績皆為 90 分；點擊按鈕即可直接加分（+1）或扣分（-1），平均為各項成績之平均。`;
             } else if(isQuiz){
                 hintMessage = '平考加點規則：項目名稱含「聽寫」滿100分加50點；項目名稱含「卷」滿100分加100點。已加點會標示標籤。';
             }
