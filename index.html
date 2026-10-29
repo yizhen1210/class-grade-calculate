@@ -1194,7 +1194,7 @@
             if(!container) return;
             container.querySelectorAll(`input[type=number][${colAttr}]`).forEach(inp => {
                 inp.addEventListener('keydown', e => {
-                    if(e.key !== 'Tab' || e.isComposing) return;
+                    if((e.key !== 'Tab' && e.key !== 'Enter') || e.isComposing || e.keyCode === 229) return;
                     const curCol = inp.getAttribute(colAttr);
                     const sameColInputs = Array.from(container.querySelectorAll(`input[type=number][${colAttr}="${curCol}"]`));
                     const idx = sameColInputs.indexOf(inp);
@@ -1227,6 +1227,9 @@
                         e.preventDefault();
                         targetInp.focus();
                         targetInp.select();
+                    } else if(e.key === 'Enter'){
+                        e.preventDefault();
+                        inp.blur();
                     }
                 });
             });
