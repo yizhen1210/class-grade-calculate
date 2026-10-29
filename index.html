@@ -826,11 +826,38 @@
             { id: 'pf_bonus', name: '加分', mode: 'bonus', step: 1 },
             { id: 'pf_deduct', name: '扣分', mode: 'deduct', step: 1 }
         ];
+        const DEFAULT_HEALTH_PF_COLUMNS = [
+            { id: 'hpf_life', name: '生活態度', step: 1 },
+            { id: 'hpf_class', name: '上課態度', step: 1 }
+        ];
         function isCoreHomework(subjectKey, cat){
             return CORE_SUBJECTS.includes(subjectKey) && cat === 'homework';
         }
         function isCorePerform(subjectKey, cat){
             return CORE_SUBJECTS.includes(subjectKey) && cat === 'perform';
+        }
+        function isHealthSubject(subjectKey){
+            if(subjectKey === '健康') return true;
+            const custom = (lastData && lastData.subjects && Array.isArray(lastData.subjects.custom)) ? lastData.subjects.custom : [];
+            const match = custom.find(c => c.id === subjectKey);
+            return !!(match && match.name && match.name.trim() === '健康');
+        }
+        function isHealthPerform(subjectKey, cat){
+            return isHealthSubject(subjectKey) && cat === 'perform';
+        }
+        function ensureHealthPerformColumns(perfBucket){
+            if(!perfBucket) return;
+            if(!perfBucket.columns || perfBucket.columns.length === 0){
+                perfBucket.columns = DEFAULT_HEALTH_PF_COLUMNS.map(c => ({ ...c }));
+                return;
+            }
+            const targetNames = ['生活態度', '上課態度'];
+            perfBucket.columns = targetNames.map((tName, idx) => {
+                const byName = perfBucket.columns.find(c => c.name && c.name.trim() === tName);
+                if(byName) return { ...byName, name: tName, step: Number(byName.step) || 1 };
+                if(perfBucket.columns[idx]) return { ...perfBucket.columns[idx], name: tName, step: Number(perfBucket.columns[idx].step) || 1 };
+                return { ...DEFAULT_HEALTH_PF_COLUMNS[idx] };
+            });
         }
         function isBonusPerformCol(col){
             if(col && col.mode) return col.mode === 'bonus';
@@ -855,6 +882,10 @@
                 }
                 if(b.perform.columns.length === 0){
                     b.perform.columns = DEFAULT_CORE_PF_COLUMNS.map(c => ({ ...c }));
+                }
+            } else if(isHealthSubject(subjectKey)){
+                if(b.perform.columns.length === 0){
+                    b.perform.columns = DEFAULT_HEALTH_PF_COLUMNS.map(c => ({ ...c }));
                 }
             }
             if(!b.manualDaily) b.manualDaily = {}; 
@@ -975,6 +1006,30 @@
                     saveData({ scores: { daily: lastData.scores.daily }, _recoverPfBonusV1: true });
                 }
             }
+
+            /* 健康上課表現預設欄位：生活態度、上課態度（起始90分，按鈕式加扣分） */
+            if(lastData._healthPfStepV1 !== true){
+                if(!lastData.subjects.custom.some(c => c.name && c.name.trim() === '健康')){
+                    lastData.subjects.custom.push({ id: 'subj_health', name: '健康', periodMode: 'single' });
+                }
+                lastData.subjects.custom.forEach(c => {
+                    if(c.name && c.name.trim() === '健康'){
+                        const periods = c.periodMode === 'split' ? ['mid', 'final'] : ['single'];
+                        periods.forEach(pKey => {
+                            const b = ensureDailyBucket(c.id, pKey);
+                            ensureHealthPerformColumns(b.perform);
+                        });
+                    }
+                });
+                if(isAdmin){
+                    lastData._healthPfStepV1 = true;
+                    saveData({
+                        subjects: { custom: lastData.subjects.custom },
+                        scores: { daily: lastData.scores.daily },
+                        _healthPfStepV1: true
+                    });
+                }
+            }
             return lastData;
         }
 
@@ -993,6 +1048,18 @@
             return Math.max(0, Math.min(100, 90 + delta));
         }
 
+        function healthPerformColScore(bucket, sid, colId){
+            const raw = getLeaf(bucket && bucket.values && bucket.values[sid], colId);
+            if(raw === null) return 90;
+            return Math.max(0, Math.min(100, raw));
+        }
+
+        function healthPerformAverage(bucket, sid){
+            if(!bucket || !bucket.columns || !bucket.columns.length) return 90;
+            const vals = bucket.columns.map(c => healthPerformColScore(bucket, sid, c.id));
+            return vals.reduce((a, b) => a + b, 0) / vals.length;
+        }
+
         function categoryAverage(bucket, sid, isDeduction = false){
             if(isDeduction){
                 if(!bucket || !bucket.columns) return 100;
@@ -1007,12 +1074,15 @@
             if(!vals.length) return null;
             return vals.reduce((a, b) => a + b, 0) / vals.length;
         }
-        function dailyScore100FromBucket(bucket, sid, weights, isCore = undefined){
+        function dailyScore100FromBucket(bucket, sid, weights, isCore = undefined, subjectKey = undefined){
             const w = weights || { homework: 0.4, quiz: 0.4, perform: 0.2 };
             const useCoreRule = isCore !== undefined ? isCore : (w.quiz > 0);
+            const isHealth = subjectKey ? isHealthSubject(subjectKey) : false;
             const hw = categoryAverage(bucket.homework, sid, useCoreRule);
             const qz = categoryAverage(bucket.quiz, sid, false);
-            const pf = useCoreRule ? corePerformScore(bucket.perform, sid) : categoryAverage(bucket.perform, sid, false);
+            const pf = useCoreRule
+                ? corePerformScore(bucket.perform, sid)
+                : (isHealth ? healthPerformAverage(bucket.perform, sid) : categoryAverage(bucket.perform, sid, false));
             return (hw || 0) * w.homework + (qz || 0) * w.quiz + (pf || 0) * w.perform;
         }
         function effectiveDaily100(bucket, sid, weights, pulledOut){
@@ -1135,17 +1205,18 @@
             }
             const isCoreHw = isCoreHomework(dailySubjectKey, dailyCategoryTab);
             const isCorePf = isCorePerform(dailySubjectKey, dailyCategoryTab);
+            const isHealthPf = isHealthPerform(dailySubjectKey, dailyCategoryTab);
             addBtn.classList.remove('hidden');
             addBtn.textContent = isCoreHw ? `＋ 新增作業扣分項目` : `＋ 新增${CATEGORY_LABEL[dailyCategoryTab]}項目`;
             addBtn.onclick = () => addDailyColumn(area, bucket, dailyCategoryTab, sub);
             clearBtn.classList.remove('hidden');
-            clearBtn.textContent = isCoreHw ? `清空作業扣分` : (isCorePf ? `清空表現加扣分` : `清空${CATEGORY_LABEL[dailyCategoryTab]}分數`);
+            clearBtn.textContent = isCoreHw ? `清空作業扣分` : ((isCorePf || isHealthPf) ? `清空表現加扣分` : `清空${CATEGORY_LABEL[dailyCategoryTab]}分數`);
             clearBtn.onclick = async () => {
                 const catBucket = bucket[dailyCategoryTab];
                 let confirmMsg = `確定清空「${CATEGORY_LABEL[dailyCategoryTab]}」目前所有學生的分數？項目欄位會保留，此動作無法復原。`;
                 if(isCoreHw){
                     confirmMsg = `確定清空「作業」目前所有學生的扣分紀錄？清空後起始分數將恢復為 100 分，項目欄位會保留，此動作無法復原。`;
-                } else if(isCorePf){
+                } else if(isCorePf || isHealthPf){
                     confirmMsg = `確定清空「上課表現」目前所有學生的加扣分紀錄？清空後基本分數將恢復為 90 分，項目欄位會保留，此動作無法復原。`;
                 }
                 const ok = await askConfirm(confirmMsg);
@@ -1241,12 +1312,15 @@
             const isQuiz = (cat === 'quiz');
             const isCoreHw = isCoreHomework(dailySubjectKey, cat);
             const isCorePf = isCorePerform(dailySubjectKey, cat);
+            const isHealthPf = isHealthPerform(dailySubjectKey, cat);
 
             let hintMessage = '每一欄可自訂名稱（例如「第1次習作」），成績以 0–100 分登記；學生的「平均」為該生已填欄位的平均分數。';
             if(isCoreHw){
                 hintMessage = '作業成績固定起始分數為 100 分；點擊按鈕即可直接扣分（字醜、遲交一次扣 1 分，缺交一次扣 2 分；按「+」可加回誤扣分數）。';
             } else if(isCorePf){
                 hintMessage = '上課表現基本分數固定為 90 分；點擊按鈕即可直接增減分數（表現成績 ＝ 90 ＋ 加分 － 扣分，最高 100 分、最低 0 分）。';
+            } else if(isHealthPf){
+                hintMessage = '健康上課表現預設為「生活態度」與「上課態度」，兩項起始成績皆為 90 分；點擊按鈕即可直接加分（+1）或扣分（-1），平均為各項成績之平均。';
             } else if(isQuiz){
                 hintMessage = '平考加點規則：項目名稱含「聽寫」滿100分加50點；項目名稱含「卷」滿100分加100點。已加點會標示標籤。';
             }
@@ -1304,7 +1378,7 @@
                     body.appendChild(tr);
                     return;
                 }
-                const avg = isCorePf ? corePerformScore(catBucket, s.id) : categoryAverage(catBucket, s.id, isCoreHw);
+                const avg = isCorePf ? corePerformScore(catBucket, s.id) : (isHealthPf ? healthPerformAverage(catBucket, s.id) : categoryAverage(catBucket, s.id, isCoreHw));
 
                 // 計算可加點數與已加點數
                 let pendingPts = 0;
@@ -1344,6 +1418,18 @@
                                 </div>
                             </td>`;
                         }
+                    }
+                    if(isHealthPf){
+                        const step = Number(c.step) || 1;
+                        const curScore = healthPerformColScore(catBucket, s.id, c.id);
+                        const toneClass = curScore > 90 ? 'has-bonus' : (curScore < 90 ? 'has-deduct' : '');
+                        return `<td>
+                            <div class="deduct-stepper">
+                                <button type="button" class="deduct-btn bonus-add" data-act="inc" data-col="${c.id}" ${curScore >= 100 ? 'disabled' : ''}>+${step}</button>
+                                <span class="deduct-val ${toneClass}" data-val="${c.id}">${fmt(curScore)}</span>
+                                <button type="button" class="deduct-btn minus" data-act="dec" data-col="${c.id}" ${curScore <= 0 ? 'disabled' : ''}>-${step}</button>
+                            </div>
+                        </td>`;
                     }
                     let badgeHtml = '';
                     if(isQuiz){
@@ -1425,6 +1511,31 @@
                         incBtn.onclick = () => applyDelta(step);
                         decBtn.onclick = () => applyDelta(-step);
                     });
+                } else if(isHealthPf){
+                    catBucket.columns.forEach(c => {
+                        const step = Number(c.step) || 1;
+                        const incBtn = tr.querySelector(`button[data-act="inc"][data-col="${c.id}"]`);
+                        const decBtn = tr.querySelector(`button[data-act="dec"][data-col="${c.id}"]`);
+                        const valSpan = tr.querySelector(`span[data-val="${c.id}"]`);
+
+                        const applyDelta = (delta) => {
+                            if(!catBucket.values[s.id]) catBucket.values[s.id] = {};
+                            const cur = healthPerformColScore(catBucket, s.id, c.id);
+                            const next = Math.max(0, Math.min(100, cur + delta));
+                            catBucket.values[s.id][c.id] = next === 90 ? null : next;
+                            valSpan.textContent = fmt(next);
+                            valSpan.classList.toggle('has-bonus', next > 90);
+                            valSpan.classList.toggle('has-deduct', next < 90);
+                            incBtn.disabled = next >= 100;
+                            decBtn.disabled = next <= 0;
+                            const newAvg = healthPerformAverage(catBucket, s.id);
+                            tr.querySelector('[data-f=avg]').textContent = fmt(newAvg);
+                            saveLeaf(['scores', 'daily', dailySubjectKey, dailyPeriod, cat, 'values', s.id], catBucket.values[s.id]);
+                        };
+
+                        incBtn.onclick = () => applyDelta(step);
+                        decBtn.onclick = () => applyDelta(-step);
+                    });
                 } else {
                     catBucket.columns.forEach(c => {
                         const inp = tr.querySelector(`input[data-col="${c.id}"]`);
@@ -1444,7 +1555,7 @@
                 body.appendChild(tr);
             });
 
-            if(!isCoreHw && !isCorePf){
+            if(!isCoreHw && !isCorePf && !isHealthPf){
                 bindVerticalTabNavigation(body, 'data-col', catBucket.columns.map(c => c.id));
                 restoreActiveScoreInput(body, 'data-col', savedFocus);
             }
@@ -1580,10 +1691,11 @@
                                 const manualVal = getLeaf(bucket.manualDaily, s.id);
                                 return `<tr><td class="name-cell">${escapeHtml(s.name)}</td><td>－</td>${sub.hasExam ? '<td>－</td>' : ''}<td>－</td><td><input type="number" class="manual-daily-input" data-sid="${s.id}" min="0" max="100" step="0.5" value="${manualVal ?? ''}"></td></tr>`;
                             }
+                            const isHealth = isHealthSubject(sub.key);
                             const hw = categoryAverage(bucket.homework, s.id, sub.hasExam);
                             const qz = categoryAverage(bucket.quiz, s.id, false);
-                            const pf = sub.hasExam ? corePerformScore(bucket.perform, s.id) : categoryAverage(bucket.perform, s.id, false);
-                            const total = dailyScore100FromBucket(bucket, s.id, weights, sub.hasExam);
+                            const pf = sub.hasExam ? corePerformScore(bucket.perform, s.id) : (isHealth ? healthPerformAverage(bucket.perform, s.id) : categoryAverage(bucket.perform, s.id, false));
+                            const total = dailyScore100FromBucket(bucket, s.id, weights, sub.hasExam, sub.key);
                             return `<tr><td class="name-cell">${escapeHtml(s.name)}</td><td>${hw !== null ? fmt(hw) : '-'}</td>${sub.hasExam ? `<td>${qz !== null ? fmt(qz) : '-'}</td>` : ''}<td>${pf !== null ? fmt(pf) : '-'}</td><td class="derived">${fmt(total)}</td></tr>`;
                         }).join('')}</tbody>
                     </table>
@@ -1950,10 +2062,10 @@
                     if(sub.periodMode === 'split'){
                         const midBucket = ensureDailyBucket(sub.key, 'mid');
                         const finalBucket = ensureDailyBucket(sub.key, 'final');
-                        total = (dailyScore100FromBucket(midBucket, s.id, weights) + dailyScore100FromBucket(finalBucket, s.id, weights)) / 2;
+                        total = (dailyScore100FromBucket(midBucket, s.id, weights, false, sub.key) + dailyScore100FromBucket(finalBucket, s.id, weights, false, sub.key)) / 2;
                     } else {
                         const bucket = ensureDailyBucket(sub.key, 'single');
-                        total = dailyScore100FromBucket(bucket, s.id, weights);
+                        total = dailyScore100FromBucket(bucket, s.id, weights, false, sub.key);
                     }
                     html += `<tr><td class="name-cell">${escapeHtml(s.name)}</td><td class="derived">${fmt(total)}</td><td>${letterGrade(total)}</td><td>${effortLevel100(total)}</td></tr>`;
                 });
